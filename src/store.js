@@ -1,4 +1,6 @@
-// ===== DATA STORE WITH LOCALSTORAGE =====
+// ===== DATA STORE WITH LOCALSTORAGE + FIREBASE =====
+import { saveToFirestore, subscribeToFirestore } from './firebaseSync.js';
+
 const STORAGE_KEY = 'xuong_may_data';
 
 const DEFAULT_DATA = {
@@ -20,6 +22,8 @@ class Store {
   constructor() {
     this.data = this.load();
     this.listeners = [];
+    this._isSyncingFromCloud = false;
+    this.initFirebaseSync();
   }
 
   load() {
@@ -37,6 +41,10 @@ class Store {
 
   save() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
+    // Đồng bộ lên Firebase (nếu không phải đang nhận data từ cloud)
+    if (!this._isSyncingFromCloud) {
+      saveToFirestore(this.data);
+    }
     this.notify();
   }
 
@@ -46,6 +54,17 @@ class Store {
 
   subscribe(fn) {
     this.listeners.push(fn);
+  }
+
+  // === FIREBASE REAL-TIME SYNC ===
+  initFirebaseSync() {
+    subscribeToFirestore((cloudData) => {
+      this._isSyncingFromCloud = true;
+      this.data = { ...DEFAULT_DATA, ...cloudData };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
+      this.notify();
+      this._isSyncingFromCloud = false;
+    });
   }
 
   // === ID Generators ===
