@@ -47,6 +47,14 @@ export function initSewingModule() {
       return;
     }
 
+    // Edit Sewing Card
+    const editSewBtn = e.target.closest('.btn-edit-sew');
+    if (editSewBtn) {
+      e.stopPropagation();
+      showEditSewingModal(editSewBtn.dataset.sewingId);
+      return;
+    }
+
     // Delete Sewing Card
     const delSewBtn = e.target.closest('.btn-delete-sew');
     if (delSewBtn) {
@@ -60,13 +68,34 @@ export function initSewingModule() {
       return;
     }
 
+    // Edit Delivery Card
+    const editDelBtn = e.target.closest('.btn-edit-delivery');
+    if (editDelBtn) {
+      e.stopPropagation();
+      showEditDeliveryModal(editDelBtn.dataset.deliveryId);
+      return;
+    }
+
     // Delete Delivery Card
     const delDelBtn = e.target.closest('.btn-delete-delivery');
     if (delDelBtn) {
       e.stopPropagation();
       const id = delDelBtn.dataset.deliveryId;
       if (confirm(`Bạn có chắc muốn xóa thẻ Giao Hàng này?`)) {
+        const delivery = store.getDelivery(id);
+        const delSizes = store.getDeliverySizes(id);
+        const sewingSizes = store.getSewingSizes(delivery.sewingId);
+        
+        delSizes.forEach(ds => {
+          const ss = sewingSizes.find(s => s.size === ds.size);
+          if (ss) ss.quantityReturned = Math.max(0, ss.quantityReturned - ds.quantity);
+        });
+        store.setSewingSizes(delivery.sewingId, sewingSizes);
         store.deleteDelivery(id);
+
+        const allReturned = sewingSizes.every(s => s.quantityReturned >= s.quantitySent);
+        store.updateSewing(delivery.sewingId, { status: allReturned ? 'Done' : 'Partial Return' });
+
         renderSewingTable();
         showToast('Đã xóa thẻ Giao Hàng', 'info');
       }
@@ -219,6 +248,7 @@ export function renderSewingTable() {
           <span>Lô: ${lot ? lot.fabricName + (lot.totalFabric ? ' ' + formatNumber(lot.totalFabric) + 'm' : '') : sewing.lotId}</span>
           <div style="display:flex; gap:6px; align-items:center;">
             <span style="font-size:11px; color:var(--text-muted)">${sewing.id}</span>
+            <button class="btn-icon btn-edit-sew" data-sewing-id="${sewing.id}" title="Sửa" style="padding:0; font-size:12px; color:var(--text-muted);">✏️</button>
             <button class="btn-icon btn-delete-sew" data-sewing-id="${sewing.id}" title="Xóa" style="padding:0; font-size:12px; color:var(--red);">🗑️</button>
           </div>
         </div>
@@ -253,6 +283,7 @@ export function renderSewingTable() {
           <span>Lô: ${lot ? lot.fabricName + (lot.totalFabric ? ' ' + formatNumber(lot.totalFabric) + 'm' : '') : ''}</span>
           <div style="display:flex; gap:6px; align-items:center;">
             <span style="font-size:11px; color:var(--text-muted)">${formatDate(delivery.deliveryDate || delivery.createdAt.split('T')[0])}</span>
+            <button class="btn-icon btn-edit-delivery" data-delivery-id="${delivery.id}" title="Sửa" style="padding:0; font-size:12px; color:var(--text-muted);">✏️</button>
             <button class="btn-icon btn-delete-delivery" data-delivery-id="${delivery.id}" title="Xóa" style="padding:0; font-size:12px; color:var(--red);">🗑️</button>
           </div>
         </div>
@@ -427,6 +458,109 @@ function showDeliveryModal(sewingId) {
     closeModal();
     renderSewingTable();
     showToast('Đã tạo thẻ giao hàng mới!');
+  });
+}
+
+function showEditSewingModal(sewingId) {
+  const sewing = store.getSewing(sewingId);
+  const sizes = store.getSewingSizes(sewingId);
+  
+  const sizeRows = sizes.map(s => {
+    return `<tr>
+      <td><strong>${s.size}</strong></td>
+      <td><input type="number" min="0" value="${s.quantitySent}" data-size="${s.size}" class="sewing-sent-input" style="width:100%" /></td>
+    </tr>`;
+  }).join('');
+
+  openModal(`Sửa thẻ Nhận Vải Cắt - ${sewingId}`, `
+    <div class="form-group" style="margin-bottom:12px;">
+      <label>Tên Xưởng May</label>
+      <input type="text" id="sewing-workshop-input" value="${sewing.workshopName || ''}" style="width:100%" />
+    </div>
+    <p style="margin-bottom:12px;color:var(--text-secondary);font-size:13px">Sửa số lượng vải cắt đã nhận:</p>
+    <table class="size-entry-table">
+      <thead><tr><th>Size</th><th>Số Lượng Nhận</th></tr></thead>
+      <tbody>${sizeRows}</tbody>
+    </table>`,
+    `<button class="btn btn-secondary" onclick="document.getElementById('modal-overlay').classList.add('hidden')">Hủy</button>
+     <button class="btn btn-primary" id="btn-save-sewing">Lưu Thay Đổi</button>`);
+
+  document.getElementById('btn-save-sewing').addEventListener('click', () => {
+    const workshopName = document.getElementById('sewing-workshop-input').value.trim();
+    const updatedSizes = sizes.map(s => {
+      const input = document.querySelector(`.sewing-sent-input[data-size="${s.size}"]`);
+      return { ...s, quantitySent: parseInt(input?.value) || 0 };
+    });
+
+    store.updateSewing(sewingId, { workshopName });
+    store.setSewingSizes(sewingId, updatedSizes);
+    
+    closeModal();
+    renderSewingTable();
+    showToast('Đã cập nhật thẻ Nhận Vải Cắt!');
+  });
+}
+
+function showEditDeliveryModal(deliveryId) {
+  const delivery = store.getDelivery(deliveryId);
+  const sewing = store.getSewing(delivery.sewingId);
+  const delSizes = store.getDeliverySizes(deliveryId);
+  
+  const sizeRows = delSizes.map(s => {
+    return `<tr>
+      <td><strong>${s.size}</strong></td>
+      <td><input type="number" min="0" value="${s.quantity}" data-size="${s.size}" class="del-qty-input" style="width:100%" /></td>
+    </tr>`;
+  }).join('');
+
+  const today = delivery.deliveryDate || delivery.createdAt.split('T')[0];
+
+  openModal(`Sửa Lô Giao Hàng - ${deliveryId}`, `
+    <div class="form-group" style="margin-bottom:12px;">
+      <label>Ngày Gửi Hàng *</label>
+      <input type="date" id="edit-delivery-date" value="${today}" required style="width:100%" />
+    </div>
+    <p style="margin-bottom:12px;color:var(--text-secondary);font-size:13px">Sửa số lượng giao hàng:</p>
+    <table class="size-entry-table">
+      <thead><tr><th>Size</th><th>Số Lượng Giao</th></tr></thead>
+      <tbody>${sizeRows}</tbody>
+    </table>`,
+    `<button class="btn btn-secondary" onclick="document.getElementById('modal-overlay').classList.add('hidden')">Hủy</button>
+     <button class="btn btn-primary" id="btn-save-delivery">Lưu Thay Đổi</button>`);
+
+  document.getElementById('btn-save-delivery').addEventListener('click', () => {
+    const deliveryDate = document.getElementById('edit-delivery-date').value;
+    if (!deliveryDate) {
+      showToast('Vui lòng chọn ngày gửi hàng', 'error'); return;
+    }
+
+    const sewingSizes = store.getSewingSizes(sewing.id);
+
+    // Calculate diffs and update
+    const updatedDelSizes = delSizes.map(ds => {
+      const input = document.querySelector(`.del-qty-input[data-size="${ds.size}"]`);
+      const newQty = parseInt(input?.value) || 0;
+      
+      // Update sewing sizes
+      const ss = sewingSizes.find(s => s.size === ds.size);
+      if (ss) {
+        ss.quantityReturned = Math.max(0, ss.quantityReturned - ds.quantity + newQty);
+      }
+      return { size: ds.size, quantity: newQty };
+    });
+
+    store.updateDelivery(deliveryId, { deliveryDate });
+    store.setDeliverySizes(deliveryId, updatedDelSizes);
+    store.setSewingSizes(sewing.id, sewingSizes);
+
+    // Check if status needs to change
+    const allReturned = sewingSizes.every(s => s.quantityReturned >= s.quantitySent);
+    if (allReturned) store.updateSewing(sewing.id, { status: 'Done' });
+    else store.updateSewing(sewing.id, { status: 'Partial Return' });
+
+    closeModal();
+    renderSewingTable();
+    showToast('Đã cập nhật thẻ Giao Hàng!');
   });
 }
 
