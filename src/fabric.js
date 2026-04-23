@@ -84,6 +84,10 @@ export function renderKanbanBoard() {
   const cuttingLots = allLots.filter(l => {
     const cutting = allCuttings.find(c => c.lotId === l.id && !c.isExported);
     return !!cutting;
+  }).sort((a, b) => {
+    const cuttingA = allCuttings.find(c => c.lotId === a.id && !c.isExported);
+    const cuttingB = allCuttings.find(c => c.lotId === b.id && !c.isExported);
+    return cuttingB.id.localeCompare(cuttingA.id);
   });
 
   const renderCard = (lot, isCutting) => {
@@ -238,7 +242,7 @@ function lotFormHTML(lot = {}) {
   return `<div class="form-grid">
     <div class="form-group"><label>Khách Hàng *</label><input type="text" id="lot-customer" value="${lot.customerName || ''}" required /></div>
     <div class="form-group"><label>Tên Vải *</label><input type="text" id="lot-fabric" value="${lot.fabricName || ''}" required /></div>
-    <div class="form-group"><label>Màu *</label><input type="text" id="lot-color" value="${lot.color || ''}" required /></div>
+    <div class="form-group"><label>Màu</label><input type="text" id="lot-color" value="${lot.color || ''}" /></div>
     <div class="form-group"><label>Tổng Mét Vải *</label><input type="number" id="lot-total" min="0" step="0.1" value="${lot.totalFabric || ''}" required /></div>
     <div class="form-group"><label>Ngày Nhận *</label><input type="date" id="lot-date" value="${lot.dateReceived || new Date().toISOString().split('T')[0]}" required /></div>
     <div class="form-group"><label>Ưu Tiên</label>
@@ -269,8 +273,8 @@ function showAddLotModal() {
 
   document.getElementById('btn-save-lot').addEventListener('click', () => {
     const data = getLotFormData();
-    if (!data.customerName || !data.fabricName || !data.color || !data.totalFabric) {
-      showToast('Vui lòng điền đầy đủ thông tin', 'error'); return;
+    if (!data.customerName || !data.fabricName || !data.totalFabric) {
+      showToast('Vui lòng điền đầy đủ thông tin bắt buộc', 'error'); return;
     }
     store.addLot(data);
     closeModal();
@@ -289,6 +293,9 @@ function showEditLotModal(lotId) {
 
   document.getElementById('btn-update-lot').addEventListener('click', () => {
     const data = getLotFormData();
+    if (!data.customerName || !data.fabricName || !data.totalFabric) {
+      showToast('Vui lòng điền đầy đủ thông tin bắt buộc', 'error'); return;
+    }
     store.updateLot(lotId, data);
     closeModal();
     renderKanbanBoard();
