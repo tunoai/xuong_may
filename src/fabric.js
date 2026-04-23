@@ -6,6 +6,11 @@ import { showExportCuttingModal } from './cutting.js';
 export function initFabricModule() {
   document.getElementById('btn-add-lot').addEventListener('click', showAddLotModal);
   
+  const searchInput = document.getElementById('fabric-search-input');
+  const statusFilter = document.getElementById('fabric-status-filter');
+  if (searchInput) searchInput.addEventListener('input', renderKanbanBoard);
+  if (statusFilter) statusFilter.addEventListener('change', renderKanbanBoard);
+  
   const container = document.getElementById('fabric-kanban-container');
   
   // Event delegation for card actions
@@ -15,6 +20,21 @@ export function initFabricModule() {
     if (editBtn) {
       e.stopPropagation();
       showEditLotModal(editBtn.dataset.lotId);
+      return;
+    }
+
+    // Note button
+    const noteBtn = e.target.closest('.btn-note-lot');
+    if (noteBtn) {
+      e.stopPropagation();
+      const lotId = noteBtn.dataset.lotId;
+      const lot = store.getLot(lotId);
+      const newNote = prompt(`Ghi chú cho lô vải ${lotId}:`, lot.notes || '');
+      if (newNote !== null) {
+        store.updateLot(lotId, { notes: newNote.trim() });
+        renderKanbanBoard();
+        showToast('Đã lưu ghi chú');
+      }
       return;
     }
 
@@ -73,15 +93,31 @@ export function renderKanbanBoard() {
   const allLots = store.getLots();
   const allCuttings = store.getCuttings();
 
+  const searchInput = document.getElementById('fabric-search-input');
+  const statusFilter = document.getElementById('fabric-status-filter');
+  const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+  const filterStatus = statusFilter ? statusFilter.value : 'all';
+
+  let filteredLots = allLots;
+  if (searchTerm) {
+    filteredLots = filteredLots.filter(l => 
+      l.id.toLowerCase().includes(searchTerm) ||
+      (l.customerName && l.customerName.toLowerCase().includes(searchTerm)) ||
+      (l.fabricName && l.fabricName.toLowerCase().includes(searchTerm))
+    );
+  }
+
   // Column 1: LÔ VẢI MỚI (Lots that are New and don't have an active cutting)
-  const newLots = allLots.filter(l => {
+  const newLots = filteredLots.filter(l => {
+    if (filterStatus === 'cutting') return false;
     if (l.status === 'Done' || l.status === 'Sewing' || l.status === 'QC') return false;
     const cutting = allCuttings.find(c => c.lotId === l.id && !c.isExported);
     return !cutting;
   });
 
   // Column 2: ĐANG CẮT (Lots that have an active cutting)
-  const cuttingLots = allLots.filter(l => {
+  const cuttingLots = filteredLots.filter(l => {
+    if (filterStatus === 'new') return false;
     const cutting = allCuttings.find(c => c.lotId === l.id && !c.isExported);
     return !!cutting;
   }).sort((a, b) => {
@@ -135,6 +171,7 @@ export function renderKanbanBoard() {
           <span>${lot.id}</span>
           <div style="display:flex; align-items:center; gap:6px;">
             <span style="font-size:12px; color:${prioColor}">${lot.priority === 'Normal' ? '' : '⭐ ' + lot.priority}</span>
+            <button class="btn-icon btn-note-lot" data-lot-id="${lot.id}" title="Ghi chú" style="padding:0; font-size:12px; color:var(--text-muted);">📝</button>
             <button class="btn-icon btn-edit-kanban" data-lot-id="${lot.id}" title="Sửa Lô Vải" style="padding:0; font-size:12px; color:var(--text-muted);">✏️</button>
             <button class="btn-icon btn-delete-kanban" data-lot-id="${lot.id}" title="Xóa Lô Vải" style="padding:0; font-size:12px; color:var(--red);">🗑️</button>
           </div>
@@ -149,6 +186,7 @@ export function renderKanbanBoard() {
         <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">
           Tổng mét: <strong style="color:var(--blue)">${formatNumber(lot.totalFabric)} m</strong>
         </div>
+        ${lot.notes ? `<div style="font-size:12px; color:var(--orange); margin-top:4px; padding:4px; background:rgba(245,158,11,0.1); border-radius:4px; font-style:italic;">📝 ${lot.notes}</div>` : ''}
         ${cuttingHtml}
       </div>
     `;

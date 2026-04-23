@@ -88,6 +88,14 @@
           </div>
           <button class="btn btn-primary" id="btn-add-lot">+ Tạo Lô Vải Mới</button>
         </div>
+        <div class="filters-bar" id="fabric-filters" style="margin-bottom:16px; display:flex; gap:10px;">
+          <input type="text" id="fabric-search-input" placeholder="🔍 Tìm mã lô, khách hàng, tên vải..." class="filter-input" style="width: 250px;" />
+          <select id="fabric-status-filter" class="filter-input">
+            <option value="all">Tất cả trạng thái</option>
+            <option value="new">Chưa cắt (Lô vải mới)</option>
+            <option value="cutting">Đang cắt</option>
+          </select>
+        </div>
         <div id="fabric-kanban-container" class="kanban-board">
           <!-- Rendered via JS -->
         </div>
