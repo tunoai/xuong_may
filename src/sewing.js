@@ -249,7 +249,7 @@ export function renderSewingTable() {
         <div class="kanban-card-title">
           <span>Lô: ${lot ? lot.fabricName + (lot.totalFabric ? ' ' + formatNumber(lot.totalFabric) + 'm' : '') : ''}</span>
           <div style="display:flex; gap:6px; align-items:center;">
-            <span style="font-size:11px; color:var(--text-muted)">${formatDate(delivery.createdAt.split('T')[0])}</span>
+            <span style="font-size:11px; color:var(--text-muted)">${formatDate(delivery.deliveryDate || delivery.createdAt.split('T')[0])}</span>
             <button class="btn-icon btn-delete-delivery" data-delivery-id="${delivery.id}" title="Xóa" style="padding:0; font-size:12px; color:var(--red);">🗑️</button>
           </div>
         </div>
@@ -374,7 +374,13 @@ function showDeliveryModal(sewingId) {
     </tr>`;
   }).join('');
 
+  const today = new Date().toISOString().split('T')[0];
+
   openModal(`Tạo Lô Giao Hàng - ${sewingId}`, `
+    <div class="form-group" style="margin-bottom:12px;">
+      <label>Ngày Gửi Hàng *</label>
+      <input type="date" id="delivery-date-input" value="${today}" required style="width:100%" />
+    </div>
     <p style="margin-bottom:12px;color:var(--text-secondary);font-size:13px">Nhập số lượng hàng thành phẩm may xong để giao:</p>
     <table class="size-entry-table">
       <thead><tr><th>Size</th><th>Đã Nhận</th><th>Đã Giao</th><th>Đang May</th><th>Giao Lần Này</th></tr></thead>
@@ -384,6 +390,12 @@ function showDeliveryModal(sewingId) {
      <button class="btn btn-primary" id="btn-confirm-return">Tạo Thẻ Giao Hàng</button>`);
 
   document.getElementById('btn-confirm-return').addEventListener('click', () => {
+    const deliveryDate = document.getElementById('delivery-date-input').value;
+    if (!deliveryDate) {
+      showToast('Vui lòng chọn ngày gửi hàng', 'error');
+      return;
+    }
+
     const updatedSewingSizes = sizes.map(s => {
       const input = document.querySelector(`.return-input[data-size="${s.size}"]`);
       const extra = parseInt(input?.value) || 0;
@@ -406,7 +418,7 @@ function showDeliveryModal(sewingId) {
     else store.updateSewing(sewingId, { status: 'Partial Return' });
 
     // Create delivery record
-    const delivery = store.addDelivery({ sewingId: sewingId });
+    const delivery = store.addDelivery({ sewingId: sewingId, deliveryDate: deliveryDate });
     store.setDeliverySizes(delivery.id, deliverySizes);
 
     closeModal();
