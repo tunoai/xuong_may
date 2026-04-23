@@ -12,18 +12,16 @@ export function initSewingModule() {
   const workshops = [...new Set(store.getSewings().map(s => s.workshopName).filter(Boolean))];
 
   buildFilterBar('sewing-filters', [
-    { type: 'select', id: 'filter-sewing-lot', label: 'Lô vải', options: [
-      { value: '', label: 'Tất cả' },
-      ...lots.map(l => ({ value: l.id, label: `${l.fabricName || l.id} - ${l.customerName || ''}` }))
+    { type: 'datalist', id: 'filter-sewing-lot', label: 'Lô vải', placeholder: 'Gõ để tìm lô...', options: [
+      ...lots.map(l => ({ value: l.id, label: `${l.fabricName || ''} - ${l.customerName || ''}` }))
     ]},
-    { type: 'select', id: 'filter-sewing-workshop', label: 'Xưởng may', options: [
-      { value: '', label: 'Tất cả' },
+    { type: 'datalist', id: 'filter-sewing-workshop', label: 'Xưởng may', placeholder: 'Gõ tên xưởng...', options: [
       ...workshops.map(w => ({ value: w, label: w }))
     ]}
   ]);
 
-  document.getElementById('filter-sewing-lot').addEventListener('change', renderSewingTable);
-  document.getElementById('filter-sewing-workshop').addEventListener('change', renderSewingTable);
+  document.getElementById('filter-sewing-lot').addEventListener('input', renderSewingTable);
+  document.getElementById('filter-sewing-workshop').addEventListener('input', renderSewingTable);
 
   // Search filter listener
   const searchInput = document.getElementById('sewing-search');
@@ -145,12 +143,17 @@ export function renderSewingTable() {
   const allDeliveries = store.getDeliveries();
 
   const searchQuery = document.getElementById('sewing-search')?.value.toLowerCase() || '';
-  const filterLotId = document.getElementById('filter-sewing-lot')?.value || '';
-  const filterWorkshop = document.getElementById('filter-sewing-workshop')?.value || '';
+  const filterLotId = document.getElementById('filter-sewing-lot')?.value.toLowerCase() || '';
+  const filterWorkshop = document.getElementById('filter-sewing-workshop')?.value.toLowerCase() || '';
 
   const filterItem = (s) => {
-    if (filterLotId && s.lotId !== filterLotId) return false;
-    if (filterWorkshop && s.workshopName !== filterWorkshop) return false;
+    if (filterLotId) {
+      const lot = store.getLot(s.lotId);
+      const lotStr = `${s.lotId} ${lot?.fabricName || ''} ${lot?.customerName || ''}`.toLowerCase();
+      if (!lotStr.includes(filterLotId)) return false;
+    }
+    if (filterWorkshop && !(s.workshopName || '').toLowerCase().includes(filterWorkshop)) return false;
+    
     if (!searchQuery) return true;
     const lot = store.getLot(s.lotId);
     const textToSearch = `${s.id} ${s.lotId} ${lot?.customerName || ''} ${lot?.fabricName || ''} ${s.workshopName || ''}`.toLowerCase();

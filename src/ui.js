@@ -91,6 +91,13 @@ export function buildFilterBar(containerId, filters) {
       const opts = f.options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
       return `<div class="filter-group"><label>${f.label}:</label><select id="${f.id}">${opts}</select></div>`;
     }
+    if (f.type === 'datalist') {
+      const opts = f.options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+      return `<div class="filter-group"><label>${f.label}:</label>
+        <input type="text" id="${f.id}" list="${f.id}-list" placeholder="${f.placeholder || 'Gõ để tìm...'}" autocomplete="off" />
+        <datalist id="${f.id}-list">${opts}</datalist>
+      </div>`;
+    }
     return `<div class="filter-group"><label>${f.label}:</label><input type="text" id="${f.id}" placeholder="${f.placeholder || ''}" /></div>`;
   }).join('');
 }
