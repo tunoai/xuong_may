@@ -88,13 +88,19 @@
           </div>
           <button class="btn btn-primary" id="btn-add-lot">+ Tạo Lô Vải Mới</button>
         </div>
-        <div class="filters-bar" id="fabric-filters" style="margin-bottom:16px; display:flex; gap:10px;">
-          <input type="text" id="fabric-search-input" placeholder="🔍 Tìm mã lô, khách hàng, tên vải..." class="filter-input" style="width: 250px;" />
-          <select id="fabric-status-filter" class="filter-input">
-            <option value="all">Tất cả trạng thái</option>
-            <option value="new">Chưa cắt (Lô vải mới)</option>
-            <option value="cutting">Đang cắt</option>
-          </select>
+        <div class="filters-bar" id="fabric-filters" style="margin-bottom:20px; display:flex; align-items:center; gap:20px; background:var(--bg-card); padding:16px 20px; border-radius:var(--radius); border:1px solid var(--border); box-shadow:var(--shadow-sm);">
+          <div class="topbar-search" style="margin:0; flex:1; max-width:400px; background:var(--bg-body); border-color:var(--border-light);">
+            <span class="topbar-search-icon">🔍</span>
+            <input type="text" id="fabric-search-input" placeholder="Tìm mã lô, khách hàng, tên vải..." />
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <label style="font-size:12px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Trạng thái:</label>
+            <select id="fabric-status-filter" style="padding:8px 14px; background:var(--bg-body); border:1px solid var(--border-light); border-radius:var(--radius-sm); color:var(--text-primary); font-family:var(--font); font-size:13px; outline:none; cursor:pointer; transition:var(--transition);">
+              <option value="all">🌟 Tất cả</option>
+              <option value="new">📦 Chưa cắt (Lô vải mới)</option>
+              <option value="cutting">✂️ Đang cắt</option>
+            </select>
+          </div>
         </div>
         <div id="fabric-kanban-container" class="kanban-board">
           <!-- Rendered via JS -->
