@@ -10,12 +10,12 @@ const DEFAULT_DATA = {
   sewings: [],
   sewingSizes: [],
   deliveries: [],
-  deliverySizes: [],
   qcRecords: [],
   qcResults: [],
   reworks: [],
+  techpacks: [],
   prioritySizes: {},
-  counters: { lot: 0, cutting: 0, sewing: 0, delivery: 0, qc: 0, rework: 0 }
+  counters: { lot: 0, cutting: 0, sewing: 0, delivery: 0, qc: 0, rework: 0, techpack: 0 }
 };
 
 class Store {
@@ -457,6 +457,33 @@ class Store {
 
     return result;
   }
+
+  // ===== TECHPACKS & BOM =====
+  getTechpacks() { return this.data.techpacks || []; }
+  
+  addTechpack(techpack) {
+    this.data.counters.techpack = (this.data.counters.techpack || 0) + 1;
+    const newTechpack = { 
+      id: `TP-${this.data.counters.techpack.toString().padStart(4, '0')}`, 
+      ...techpack, 
+      createdAt: new Date().toISOString() 
+    };
+    if (!this.data.techpacks) this.data.techpacks = [];
+    this.data.techpacks.push(newTechpack);
+    this.save();
+    return newTechpack;
+  }
+
+  updateTechpack(id, updates) {
+    this.data.techpacks = this.data.techpacks.map(t => t.id === id ? { ...t, ...updates } : t);
+    this.save();
+  }
+
+  deleteTechpack(id) {
+    this.data.techpacks = this.data.techpacks.filter(t => t.id !== id);
+    this.save();
+  }
+
 
   // === EXPORT / IMPORT ===
   exportData() { return JSON.stringify(this.data, null, 2); }

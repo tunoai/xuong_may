@@ -7,6 +7,7 @@ import { initSewingModule, renderSewingTable } from './sewing.js';
 import { initHistoryModule, renderHistory } from './history.js';
 import { initReworkModule, renderReworkBoard } from './rework.js';
 import { renderDashboard } from './dashboard.js';
+import { initTechpack } from './techpack.js';
 
 // === Navigation ===
 let currentModule = 'dashboard';
@@ -35,6 +36,11 @@ function refreshModule(moduleName) {
     case 'sewing': renderSewingTable(); break;
     case 'history': renderHistory(); break;
     case 'rework': renderReworkBoard(); break;
+    case 'techpack': {
+      const tpSearch = document.getElementById('techpack-search');
+      if (tpSearch) tpSearch.dispatchEvent(new Event('input'));
+      break;
+    }
   }
 }
 
@@ -88,6 +94,7 @@ function init() {
   initSewingModule();
   initHistoryModule();
   initReworkModule();
+  initTechpack();
   renderDashboard();
 }
 
