@@ -155,21 +155,18 @@ body {
   align-items: center;
   gap: 10px;
 }
-.logo-icon { font-size: 22px; }
+.logo-img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  border-radius: 6px;
+}
 .logo-text {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
   color: var(--text-primary);
-  letter-spacing: 0.5px;
-}
-.logo-sub {
-  font-size: 10px;
-  color: var(--text-muted);
-  margin-top: 2px;
-  display: block;
-  padding-left: 32px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
+  line-height: 1.2;
 }
 
 #main-nav {
