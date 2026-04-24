@@ -10,6 +10,7 @@ let sizeChart = null;
 let dashboardFilters = {
   lotSearch: '',
   workshopSearch: '',
+  materialSearch: '',
   prioOnly: false
 };
 
@@ -278,6 +279,51 @@ export function renderDashboard() {
   });
   const overallProgress = totalCutAll > 0 ? Math.round((totalPassedAll / totalCutAll) * 100) : 0;
 
+  // === Material Stock & Shortage Calculation ===
+  const materialStats = {};
+  store.getMaterials().forEach(m => {
+    materialStats[m.id] = { name: m.name, stock: m.stock, unit: m.unit, required: 0 };
+  });
+
+  lots.forEach(lot => {
+    if (!lot.techpackId) return;
+    const tp = store.getTechpacks().find(t => t.id === lot.techpackId);
+    if (!tp || !tp.bom) return;
+    
+    const summary = store.getLotSummary(lot.id);
+    if (!summary) return;
+    
+    const pendingGarments = summary.totalCut - summary.totalReturned;
+    if (pendingGarments > 0) {
+      tp.bom.forEach(b => {
+        if (b.materialId && materialStats[b.materialId]) {
+          materialStats[b.materialId].required += (b.quantity * pendingGarments);
+        }
+      });
+    }
+  });
+
+  const materialRows = Object.values(materialStats).filter(m => {
+    if (dashboardFilters.materialSearch) {
+       const q = dashboardFilters.materialSearch.toLowerCase();
+       if (!m.name.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  }).map(m => {
+    const isShort = m.stock < m.required;
+    const shortage = isShort ? (m.required - m.stock) : 0;
+    return `
+      <tr>
+        <td><strong>${m.name}</strong></td>
+        <td style="color:var(--blue); font-weight:bold">${formatNumber(m.stock)} ${m.unit}</td>
+        <td>${formatNumber(m.required)} ${m.unit}</td>
+        <td style="color:${isShort ? 'var(--red)' : 'var(--green)'}; font-weight:bold">
+          ${isShort ? `Thiếu ${formatNumber(shortage)}` : 'Đủ'}
+        </td>
+      </tr>
+    `;
+  }).join('');
+
   container.innerHTML = `
     <!-- FILTER BAR -->
     <div class="dash-filter-bar" id="dash-filter-bar">
@@ -292,10 +338,14 @@ export function renderDashboard() {
           ${allWorkshops.map(w => `<option value="${w}">`).join('')}
         </datalist>
       </div>
+      <div class="dash-filter-item">
+        <span class="dash-filter-icon">📦</span>
+        <input type="text" id="dash-filter-material" placeholder="Lọc phụ liệu..." value="${dashboardFilters.materialSearch}" autocomplete="off" />
+      </div>
       <button class="dash-filter-btn${dashboardFilters.prioOnly ? ' active' : ''}" id="dash-filter-prio" title="Chỉ hiện lô có size ưu tiên">
         ⭐ Size Ưu Tiên
       </button>
-      ${(dashboardFilters.lotSearch || dashboardFilters.workshopSearch || dashboardFilters.prioOnly) ? 
+      ${(dashboardFilters.lotSearch || dashboardFilters.workshopSearch || dashboardFilters.materialSearch || dashboardFilters.prioOnly) ? 
         `<button class="dash-filter-clear" id="dash-filter-clear">✕ Xóa bộ lọc</button>` : ''}
     </div>
 
@@ -348,6 +398,25 @@ export function renderDashboard() {
       <h3>📊 So Sánh Tổng Theo Size</h3>
       <div class="chart-container"><canvas id="chart-size"></canvas></div>
     </div>` : ''}
+    <!-- Material Shortage Report -->
+    <div class="dashboard-section" style="margin-top:20px;">
+      <h3>📦 Tồn Kho & Dự Báo Phụ Liệu <span style="font-size:12px; font-weight:400; color:var(--text-muted)">(Cần dùng cho hàng đang cắt/may)</span></h3>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Tên Phụ Liệu</th>
+              <th>Tồn Kho Hiện Tại</th>
+              <th>Cần Dùng (Đang May)</th>
+              <th>Trạng Thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${materialRows || '<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted)">Không có dữ liệu phụ liệu</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
   `;
 
   // === Setup filter listeners ===
@@ -360,6 +429,7 @@ export function renderDashboard() {
 function setupDashboardFilters() {
   const lotInput = document.getElementById('dash-filter-lot');
   const workshopInput = document.getElementById('dash-filter-workshop');
+  const matInput = document.getElementById('dash-filter-material');
   const prioBtn = document.getElementById('dash-filter-prio');
   const clearBtn = document.getElementById('dash-filter-clear');
 
@@ -370,12 +440,14 @@ function setupDashboardFilters() {
     debounce = setTimeout(() => {
       dashboardFilters.lotSearch = lotInput?.value || '';
       dashboardFilters.workshopSearch = workshopInput?.value || '';
+      dashboardFilters.materialSearch = matInput?.value || '';
       renderDashboard();
     }, 300);
   };
 
   lotInput?.addEventListener('input', triggerFilter);
   workshopInput?.addEventListener('input', triggerFilter);
+  matInput?.addEventListener('input', triggerFilter);
 
   prioBtn?.addEventListener('click', () => {
     dashboardFilters.prioOnly = !dashboardFilters.prioOnly;
@@ -383,7 +455,7 @@ function setupDashboardFilters() {
   });
 
   clearBtn?.addEventListener('click', () => {
-    dashboardFilters = { lotSearch: '', workshopSearch: '', prioOnly: false };
+    dashboardFilters = { lotSearch: '', workshopSearch: '', materialSearch: '', prioOnly: false };
     renderDashboard();
   });
 }
