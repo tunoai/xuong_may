@@ -1,0 +1,37 @@
+{
+  "name": "Xưởng May Bí Ngô",
+  "short_name": "Bí Ngô",
+  "description": "Hệ thống quản lý sản xuất xưởng may Bí Ngô - Theo dõi quy trình từ nhận vải đến hoàn tất",
+  "start_url": "/xuong_may/",
+  "scope": "/xuong_may/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b0f19",
+  "theme_color": "#e88c30",
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "logo-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "logo-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
