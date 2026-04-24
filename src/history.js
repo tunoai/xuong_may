@@ -138,7 +138,6 @@ export function renderHistory() {
       </tbody>
     </table>
   `;
-  `;
 }
 
 window.deleteHistoryRecord = (id, type) => {
