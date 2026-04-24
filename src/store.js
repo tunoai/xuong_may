@@ -515,7 +515,9 @@ class Store {
 
   consumeMaterialsForLot(lotId, garmentsCount) {
     if (!this.data.techpacks || !this.data.materials) return;
-    const tp = this.data.techpacks.find(t => t.lotId === lotId);
+    const lot = this.getLot(lotId);
+    if (!lot || !lot.techpackId) return;
+    const tp = this.data.techpacks.find(t => t.id === lot.techpackId);
     if (!tp || !tp.bom) return;
     
     tp.bom.forEach(b => {

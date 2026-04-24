@@ -26,7 +26,7 @@ function renderTechpacks() {
   );
 
   listEl.innerHTML = filtered.map(t => {
-    const lot = store.getLots().find(l => l.id === t.lotId);
+    const usingLotsCount = store.getLots().filter(l => l.techpackId === t.id).length;
     const mainImage = t.images && t.images.length > 0 ? t.images[0].url : '';
     
     return `
@@ -37,11 +37,12 @@ function renderTechpacks() {
         <div class="tp-content">
           <div class="tp-header">
             <h3 class="tp-title">${t.productName}</h3>
-            <span class="tp-lot-badge">${lot ? lot.id : t.lotId}</span>
+            <span class="tp-lot-badge" style="background:var(--bg-input);color:var(--text-secondary);border:none;">${t.id}</span>
           </div>
           <p class="tp-desc">${t.description || 'Không có mô tả'}</p>
           
           <div class="tp-stats">
+            <span class="tp-stat">📦 ${usingLotsCount} Lô</span>
             <span class="tp-stat">🖼️ ${t.images ? t.images.length : 0} Hình</span>
             <span class="tp-stat">🧵 ${t.bom ? t.bom.length : 0} Vật tư</span>
           </div>
@@ -60,7 +61,7 @@ function renderTechpacks() {
 window.viewTechpack = (id) => {
   const t = store.getTechpacks().find(tp => tp.id === id);
   if (!t) return;
-  const lot = store.getLots().find(l => l.id === t.lotId);
+  const usingLots = store.getLots().filter(l => l.techpackId === t.id);
 
   let imagesHtml = '';
   if (t.images && t.images.length > 0) {
@@ -87,7 +88,7 @@ window.viewTechpack = (id) => {
   openModal(`Mẫu: ${t.productName}`, `
     <div class="tp-view-container">
       <div class="tp-view-info">
-        <p><strong>Lô Vải:</strong> ${lot ? `${lot.id} - ${lot.fabricName}` : t.lotId}</p>
+        <p><strong>Đang áp dụng cho:</strong> ${usingLots.length > 0 ? usingLots.map(l => l.id).join(', ') : 'Chưa gắn lô nào'}</p>
         <p><strong>Mô tả:</strong> ${t.description || '...'}</p>
       </div>
       
@@ -128,21 +129,11 @@ function openTechpackModal(editId = null) {
   currentImages = t && t.images ? [...t.images] : [];
   currentBom = t && t.bom ? [...t.bom] : [];
 
-  const lots = store.getLots();
-  const lotOpts = lots.map(l => `<option value="${l.id}">${l.id} - ${l.fabricName}</option>`).join('');
-
   openModal(isEdit ? 'Sửa Mẫu & Định Mức' : 'Thêm Mẫu Mới', `
     <div class="form-grid">
       <div class="form-group full">
         <label>Tên Sản Phẩm * (VD: Áo đầu bếp tay ngắn)</label>
         <input type="text" id="tp-name" value="${t ? t.productName : ''}" placeholder="Nhập tên thành phẩm..." />
-      </div>
-      <div class="form-group">
-        <label>Áp dụng cho Lô Vải *</label>
-        <input type="text" id="tp-lot" list="tp-lot-list" value="${t ? t.lotId : ''}" placeholder="Gõ để tìm mã lô vải..." autocomplete="off" />
-        <datalist id="tp-lot-list">
-          ${lotOpts}
-        </datalist>
       </div>
       <div class="form-group full">
         <label>Mô tả / Lưu ý chung</label>
@@ -172,8 +163,8 @@ function openTechpackModal(editId = null) {
     </div>
 
     <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
-      <button class="btn-secondary" onclick="closeModal()">Hủy</button>
-      <button class="btn-primary" id="btn-save-tp">${isEdit ? 'Cập Nhật' : 'Lưu Lại'}</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Hủy</button>
+      <button class="btn btn-primary" id="btn-save-tp">${isEdit ? 'Cập Nhật' : 'Lưu Lại'}</button>
     </div>
   `);
 
@@ -208,11 +199,10 @@ function openTechpackModal(editId = null) {
 
   document.getElementById('btn-save-tp').addEventListener('click', () => {
     const name = document.getElementById('tp-name').value.trim();
-    const lotId = document.getElementById('tp-lot').value;
     const desc = document.getElementById('tp-desc').value.trim();
 
-    if (!name || !lotId) {
-      showToast('Vui lòng nhập Tên sản phẩm và chọn Lô vải', 'error');
+    if (!name) {
+      showToast('Vui lòng nhập Tên sản phẩm', 'error');
       return;
     }
 
@@ -244,7 +234,6 @@ function openTechpackModal(editId = null) {
 
     const tpData = {
       productName: name,
-      lotId,
       description: desc,
       bom: validBom,
       images: currentImages

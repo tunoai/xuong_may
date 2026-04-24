@@ -183,6 +183,11 @@ export function renderKanbanBoard() {
         <div style="font-size:13px; color:var(--text-primary);">
           <strong>${lot.fabricName}</strong> ${lot.color ? ` - ${lot.color}` : ''}
         </div>
+        ${lot.techpackId ? `
+        <div style="font-size:11px; color:var(--blue); margin-top:4px; font-weight:600;">
+          👗 Sản phẩm: ${store.getTechpacks().find(t => t.id === lot.techpackId)?.productName || lot.techpackId}
+        </div>
+        ` : ''}
         <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">
           Tổng mét: <strong style="color:var(--blue)">${formatNumber(lot.totalFabric)} m</strong>
         </div>
@@ -277,8 +282,17 @@ export function renderKanbanBoard() {
 }
 
 function lotFormHTML(lot = {}) {
+  const techpacks = store.getTechpacks();
+  const techpackOpts = techpacks.map(t => `<option value="${t.id}" ${lot.techpackId === t.id ? 'selected' : ''}>${t.productName}</option>`).join('');
+
   return `<div class="form-grid">
-    <div class="form-group"><label>Khách Hàng *</label><input type="text" id="lot-customer" value="${lot.customerName || ''}" required /></div>
+    <div class="form-group full"><label>Khách Hàng *</label><input type="text" id="lot-customer" value="${lot.customerName || ''}" required /></div>
+    <div class="form-group"><label>Sản phẩm đầu ra (Mẫu)</label>
+      <select id="lot-techpack">
+        <option value="">-- Chưa gắn sản phẩm --</option>
+        ${techpackOpts}
+      </select>
+    </div>
     <div class="form-group"><label>Tên Vải *</label><input type="text" id="lot-fabric" value="${lot.fabricName || ''}" required /></div>
     <div class="form-group"><label>Màu</label><input type="text" id="lot-color" value="${lot.color || ''}" /></div>
     <div class="form-group"><label>Tổng Mét Vải *</label><input type="number" id="lot-total" min="0" step="0.1" value="${lot.totalFabric || ''}" required /></div>
@@ -296,6 +310,7 @@ function lotFormHTML(lot = {}) {
 function getLotFormData() {
   return {
     customerName: document.getElementById('lot-customer').value.trim(),
+    techpackId: document.getElementById('lot-techpack').value,
     fabricName: document.getElementById('lot-fabric').value.trim(),
     color: document.getElementById('lot-color').value.trim(),
     totalFabric: parseFloat(document.getElementById('lot-total').value) || 0,
