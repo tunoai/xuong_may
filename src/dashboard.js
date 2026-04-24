@@ -286,20 +286,6 @@ export function renderDashboard() {
     </div>`;
   }).filter(Boolean).join('');
 
-  // === Chart data ===
-  const allSizeData = {};
-  filteredLots.forEach(lot => {
-    const sizeBreak = store.getSizeBreakdownByLot(lot.id);
-    sizeBreak.forEach(s => {
-      if (!allSizeData[s.size]) allSizeData[s.size] = { cut: 0, returned: 0, passed: 0 };
-      allSizeData[s.size].cut += s.cut;
-      allSizeData[s.size].returned += s.returned;
-      allSizeData[s.size].passed += s.passed;
-    });
-  });
-  const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL'];
-  const chartSizes = [...sizeOrder.filter(s => allSizeData[s]), ...Object.keys(allSizeData).filter(s => !sizeOrder.includes(s))];
-
   // === Build main stat cards ===
   let totalCutAll = 0, totalSewingAll = 0, totalReturnedAll = 0, totalPassedAll = 0, totalFailedAll = 0;
   filteredLots.forEach(lot => {
@@ -403,11 +389,6 @@ export function renderDashboard() {
       </div>
     </div>
 
-    <!-- Chart -->
-    ${chartSizes.length > 0 ? `<div class="dashboard-section">
-      <h3>📊 So Sánh Tổng Theo Size</h3>
-      <div class="chart-container"><canvas id="chart-size"></canvas></div>
-    </div>` : ''}
     <!-- Material Shortage Report -->
     <div class="dashboard-section" style="margin-top:20px;">
       <h3>📦 Tồn Kho & Dự Báo Phụ Liệu <span style="font-size:12px; font-weight:400; color:var(--text-muted)">(Cần dùng cho hàng đang cắt/may)</span></h3>
@@ -428,9 +409,6 @@ export function renderDashboard() {
       </div>
     </div>
   `;
-
-  // Render chart
-  if (chartSizes.length > 0) renderSizeChart(chartSizes, allSizeData);
 }
 
 function renderFilterBar(filterBarEl, allWorkshops) {
@@ -495,34 +473,5 @@ function renderFilterBar(filterBarEl, allWorkshops) {
     dashboardFilters = { lotSearch: '', workshopSearch: '', materialSearch: '', prioOnly: false };
     filtersRendered = false;
     renderDashboard();
-  });
-}
-
-function renderSizeChart(sizes, sizeData) {
-  const canvas = document.getElementById('chart-size');
-  if (!canvas) return;
-  if (sizeChart) sizeChart.destroy();
-
-  sizeChart = new Chart(canvas, {
-    type: 'bar',
-    data: {
-      labels: sizes,
-      datasets: [
-        { label: 'Cắt', data: sizes.map(s => sizeData[s].cut), backgroundColor: 'rgba(69,170,242,0.7)', borderRadius: 4 },
-        { label: 'May Trả', data: sizes.map(s => sizeData[s].returned), backgroundColor: 'rgba(255,170,0,0.7)', borderRadius: 4 },
-        { label: 'QC Pass', data: sizes.map(s => sizeData[s].passed), backgroundColor: 'rgba(0,214,143,0.7)', borderRadius: 4 }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { position: 'top', labels: { color: '#8b90a5', font: { family: 'Inter', size: 11 } } }
-      },
-      scales: {
-        x: { ticks: { color: '#8b90a5', font: { family: 'Inter' } }, grid: { color: 'rgba(42,46,63,0.5)' } },
-        y: { ticks: { color: '#8b90a5', font: { family: 'Inter' } }, grid: { color: 'rgba(42,46,63,0.5)' }, beginAtZero: true }
-      }
-    }
   });
 }
