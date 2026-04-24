@@ -14,8 +14,9 @@ const DEFAULT_DATA = {
   qcResults: [],
   reworks: [],
   techpacks: [],
+  materials: [],
   prioritySizes: {},
-  counters: { lot: 0, cutting: 0, sewing: 0, delivery: 0, qc: 0, rework: 0, techpack: 0 }
+  counters: { lot: 0, cutting: 0, sewing: 0, delivery: 0, qc: 0, rework: 0, techpack: 0, material: 0 }
 };
 
 class Store {
@@ -481,6 +482,50 @@ class Store {
 
   deleteTechpack(id) {
     this.data.techpacks = this.data.techpacks.filter(t => t.id !== id);
+    this.save();
+  }
+
+  // ===== MATERIALS (KHO PHỤ LIỆU) =====
+  getMaterials() { return this.data.materials || []; }
+  
+  addMaterial(mat) {
+    this.data.counters.material = (this.data.counters.material || 0) + 1;
+    const newMat = { 
+      id: `MAT-${this.data.counters.material.toString().padStart(4, '0')}`, 
+      ...mat, 
+      createdAt: new Date().toISOString() 
+    };
+    if (!this.data.materials) this.data.materials = [];
+    this.data.materials.push(newMat);
+    this.save();
+    return newMat;
+  }
+
+  updateMaterial(id, updates) {
+    if (!this.data.materials) return;
+    this.data.materials = this.data.materials.map(m => m.id === id ? { ...m, ...updates } : m);
+    this.save();
+  }
+
+  deleteMaterial(id) {
+    if (!this.data.materials) return;
+    this.data.materials = this.data.materials.filter(m => m.id !== id);
+    this.save();
+  }
+
+  consumeMaterialsForLot(lotId, garmentsCount) {
+    if (!this.data.techpacks || !this.data.materials) return;
+    const tp = this.data.techpacks.find(t => t.lotId === lotId);
+    if (!tp || !tp.bom) return;
+    
+    tp.bom.forEach(b => {
+      const matId = b.materialId;
+      if (!matId) return;
+      const mat = this.data.materials.find(m => m.id === matId);
+      if (mat) {
+        mat.stock = (mat.stock || 0) - (b.quantity * garmentsCount);
+      }
+    });
     this.save();
   }
 

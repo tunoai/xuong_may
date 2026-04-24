@@ -8,6 +8,7 @@ import { initHistoryModule, renderHistory } from './history.js';
 import { initReworkModule, renderReworkBoard } from './rework.js';
 import { renderDashboard } from './dashboard.js';
 import { initTechpack } from './techpack.js';
+import { initMaterialModule, renderMaterialTable } from './material.js';
 
 // === Navigation ===
 let currentModule = 'dashboard';
@@ -41,6 +42,7 @@ function refreshModule(moduleName) {
       if (tpSearch) tpSearch.dispatchEvent(new Event('input'));
       break;
     }
+    case 'material': renderMaterialTable(); break;
   }
 }
 
@@ -95,6 +97,7 @@ function init() {
   initHistoryModule();
   initReworkModule();
   initTechpack();
+  initMaterialModule();
   renderDashboard();
 }
 

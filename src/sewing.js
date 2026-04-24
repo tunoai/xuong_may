@@ -455,9 +455,16 @@ function showDeliveryModal(sewingId) {
     const delivery = store.addDelivery({ sewingId: sewingId, deliveryDate: deliveryDate });
     store.setDeliverySizes(delivery.id, deliverySizes);
 
+    // Auto-consume materials from inventory (Kho Phụ Liệu)
+    const totalDelivered = deliverySizes.reduce((s, x) => s + x.quantity, 0);
+    const sewing = store.getSewing(sewingId);
+    if (sewing && totalDelivered > 0) {
+      store.consumeMaterialsForLot(sewing.lotId, totalDelivered);
+    }
+
     closeModal();
     renderSewingTable();
-    showToast('Đã tạo thẻ giao hàng mới!');
+    showToast('Đã tạo thẻ giao hàng mới và cập nhật tồn kho phụ liệu!');
   });
 }
 

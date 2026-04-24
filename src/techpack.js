@@ -129,7 +129,7 @@ function openTechpackModal(editId = null) {
   currentBom = t && t.bom ? [...t.bom] : [];
 
   const lots = store.getLots();
-  const lotOpts = lots.map(l => `<option value="${l.id}" ${t && t.lotId === l.id ? 'selected' : ''}>${l.id} - ${l.fabricName}</option>`).join('');
+  const lotOpts = lots.map(l => `<option value="${l.id}">${l.id} - ${l.fabricName}</option>`).join('');
 
   openModal(isEdit ? 'Sửa Mẫu & Định Mức' : 'Thêm Mẫu Mới', `
     <div class="form-grid">
@@ -139,10 +139,10 @@ function openTechpackModal(editId = null) {
       </div>
       <div class="form-group">
         <label>Áp dụng cho Lô Vải *</label>
-        <select id="tp-lot">
-          <option value="">-- Chọn Lô Vải --</option>
+        <input type="text" id="tp-lot" list="tp-lot-list" value="${t ? t.lotId : ''}" placeholder="Gõ để tìm mã lô vải..." autocomplete="off" />
+        <datalist id="tp-lot-list">
           ${lotOpts}
-        </select>
+        </datalist>
       </div>
       <div class="form-group full">
         <label>Mô tả / Lưu ý chung</label>
@@ -162,7 +162,7 @@ function openTechpackModal(editId = null) {
     <!-- Images Section -->
     <div class="tp-form-section">
       <div class="tp-form-section-header">
-        <h4>📸 Hình Ảnh (Mẫu, Chi tiết đường may...)</h4>
+        <h4>📸 Tải ảnh sản phẩm mẫu / ảnh nút / ren / mã dây kéo / đường may hoặc các lưu ý đi kèm</h4>
         <div class="tp-img-upload-wrapper">
           <button type="button" class="btn-secondary btn-sm">Thêm Ảnh</button>
           <input type="file" id="tp-img-upload" accept="image/*" multiple />
@@ -219,7 +219,13 @@ function openTechpackModal(editId = null) {
     // sync inputs
     document.querySelectorAll('.bom-item-input').forEach(input => {
       const b = currentBom.find(x => x.id === input.dataset.id);
-      if (b) b.item = input.value;
+      if (b) {
+        b.item = input.value;
+        // Extract materialId if it matches pattern "[ID] Name"
+        const match = input.value.match(/^\[(.*?)\]/);
+        if (match) b.materialId = match[1];
+        else b.materialId = null;
+      }
     });
     document.querySelectorAll('.bom-qty-input').forEach(input => {
       const b = currentBom.find(x => x.id === input.dataset.id);
@@ -264,14 +270,20 @@ function renderBomEdit() {
     return;
   }
   
-  container.innerHTML = currentBom.map(b => `
+  const mats = store.getMaterials();
+  const matOpts = mats.map(m => `<option value="[${m.id}] ${m.name}"></option>`).join('');
+
+  container.innerHTML = `
+    <datalist id="tp-mat-list">${matOpts}</datalist>
+    ${currentBom.map(b => `
     <div class="bom-edit-row">
-      <input type="text" class="bom-item-input" data-id="${b.id}" value="${b.item}" placeholder="Tên vật tư (VD: Vải lót)" style="flex:2" />
-      <input type="number" class="bom-qty-input" data-id="${b.id}" value="${b.quantity}" step="0.1" style="flex:1" />
+      <input type="text" class="bom-item-input" data-id="${b.id}" list="tp-mat-list" value="${b.item}" placeholder="Chọn/Nhập tên (VD: Vải lót)" style="flex:2" />
+      <input type="number" class="bom-qty-input" data-id="${b.id}" value="${b.quantity}" step="0.01" style="flex:1" />
       <input type="text" class="bom-unit-input" data-id="${b.id}" value="${b.unit}" placeholder="Đơn vị (VD: m)" style="flex:1" />
       <button class="btn-icon" style="color:var(--red)" onclick="removeBomItem('${b.id}')">✕</button>
     </div>
-  `).join('');
+    `).join('')}
+  `;
 }
 
 window.removeBomItem = (id) => {

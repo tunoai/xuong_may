@@ -68,6 +68,10 @@
           <span class="nav-icon">📐</span>
           <span>Mẫu & Định Mức</span>
         </a>
+        <a href="#" class="nav-item" data-module="material">
+          <span class="nav-icon">📦</span>
+          <span>Kho Phụ Liệu</span>
+        </a>
         <a href="#" class="nav-item" data-module="fabric">
           <span class="nav-icon">🧶</span>
           <span>Kho Vải & Cắt</span>
@@ -122,6 +126,37 @@
         </div>
 
         <div id="techpack-list" class="techpack-grid"></div>
+      </section>
+
+      <!-- Material Module -->
+      <section id="module-material" class="module">
+        <div class="module-header">
+          <div>
+            <h1>📦 Kho Phụ Liệu</h1>
+            <p class="module-subtitle">Quản lý nhập/xuất và theo dõi tồn kho nguyên phụ liệu</p>
+          </div>
+          <button id="btn-add-material" class="btn-primary">➕ Nhập Phụ Liệu Mới</button>
+        </div>
+        <div class="techpack-toolbar">
+          <div class="search-bar">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="material-search" placeholder="Tìm tên hoặc mã phụ liệu..." />
+          </div>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Mã PL</th>
+                <th>Tên Phụ Liệu</th>
+                <th>Tồn Kho</th>
+                <th>Đơn Vị</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="material-table-body"></tbody>
+          </table>
+        </div>
       </section>
 
       <!-- Fabric & Cutting Kanban Module -->
