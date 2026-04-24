@@ -105,7 +105,4 @@ export function buildFilterBar(containerId, filters) {
 // Setup modal close
 export function initModalClose() {
   document.getElementById('modal-close').addEventListener('click', closeModal);
-  document.getElementById('modal-overlay').addEventListener('click', (e) => {
-    if (e.target === e.currentTarget) closeModal();
-  });
 }

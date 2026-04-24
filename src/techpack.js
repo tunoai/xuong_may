@@ -145,7 +145,7 @@ function openTechpackModal(editId = null) {
     <div class="tp-form-section">
       <div class="tp-form-section-header">
         <h4>📦 Định Mức (Vật tư cần dùng cho 1 SP)</h4>
-        <button type="button" class="btn-secondary btn-sm" id="btn-add-bom">+ Thêm Vật Tư</button>
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-add-bom">+ Thêm Vật Tư</button>
       </div>
       <div id="tp-bom-list"></div>
     </div>
@@ -155,7 +155,7 @@ function openTechpackModal(editId = null) {
       <div class="tp-form-section-header">
         <h4>📸 Tải ảnh sản phẩm mẫu / ảnh nút / ren / mã dây kéo / đường may hoặc các lưu ý đi kèm</h4>
         <div class="tp-img-upload-wrapper">
-          <button type="button" class="btn-secondary btn-sm">Thêm Ảnh</button>
+          <button type="button" class="btn btn-secondary btn-sm">Thêm Ảnh</button>
           <input type="file" id="tp-img-upload" accept="image/*" multiple />
         </div>
       </div>
