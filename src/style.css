@@ -685,6 +685,39 @@ tbody tr:last-child td { border-bottom: none; }
 .dash-filter-item input::placeholder {
   color: var(--text-muted);
 }
+.dash-filter-item select {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 13px;
+  outline: none;
+  width: 100%;
+  cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+.dash-filter-select-wrapper {
+  position: relative;
+}
+.dash-filter-select-wrapper::after {
+  content: '';
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #fff;
+  pointer-events: none;
+}
+.dash-filter-item select option {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
 .dash-filter-btn {
   display: flex;
   align-items: center;

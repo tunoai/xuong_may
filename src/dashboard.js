@@ -5,6 +5,7 @@ import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);
 
 let sizeChart = null;
+let filtersRendered = false;
 
 // === FILTER STATE ===
 let dashboardFilters = {
@@ -17,8 +18,11 @@ let dashboardFilters = {
 export function renderDashboard() {
   const lots = store.getLots();
   const container = document.getElementById('dashboard-content');
+  const filterBarEl = document.getElementById('dashboard-filter-bar');
 
   if (lots.length === 0) {
+    if (filterBarEl) filterBarEl.innerHTML = '';
+    filtersRendered = false;
     container.innerHTML = `<div class="empty-state" style="padding:80px 20px">
       <div class="empty-icon">📊</div>
       <p style="font-size:16px;margin-bottom:8px">Chào mừng đến Xưởng May Manager!</p>
@@ -29,6 +33,36 @@ export function renderDashboard() {
 
   // === Collect unique workshops ===
   const allWorkshops = [...new Set(store.getSewings().map(s => s.workshopName).filter(Boolean))];
+
+  // === Render filter bar (only once, to preserve cursor) ===
+  if (!filtersRendered && filterBarEl) {
+    renderFilterBar(filterBarEl, allWorkshops);
+    filtersRendered = true;
+  } else if (filterBarEl) {
+    // Update workshop select options without destroying inputs
+    const wsSelect = document.getElementById('dash-filter-workshop');
+    if (wsSelect) {
+      const currentVal = wsSelect.value;
+      const newOpts = '<option value="">-- Tất cả xưởng --</option>' + allWorkshops.map(w => `<option value="${w}" ${w === currentVal ? 'selected' : ''}>${w}</option>`).join('');
+      wsSelect.innerHTML = newOpts;
+    }
+    // Update clear button visibility
+    const hasFilter = dashboardFilters.lotSearch || dashboardFilters.workshopSearch || dashboardFilters.materialSearch || dashboardFilters.prioOnly;
+    const clearBtn = document.getElementById('dash-filter-clear');
+    if (clearBtn) clearBtn.style.display = hasFilter ? '' : 'none';
+    else if (hasFilter) {
+      const bar = document.getElementById('dash-filter-bar-inner');
+      if (bar) bar.insertAdjacentHTML('beforeend', `<button class="dash-filter-clear" id="dash-filter-clear" style="">✕ Xóa bộ lọc</button>`);
+      document.getElementById('dash-filter-clear')?.addEventListener('click', () => {
+        dashboardFilters = { lotSearch: '', workshopSearch: '', materialSearch: '', prioOnly: false };
+        filtersRendered = false;
+        renderDashboard();
+      });
+    }
+    // Update prio button active state
+    const prioBtn = document.getElementById('dash-filter-prio');
+    if (prioBtn) prioBtn.classList.toggle('active', dashboardFilters.prioOnly);
+  }
 
   // === Alerts ===
   const alerts = [];
@@ -325,30 +359,6 @@ export function renderDashboard() {
   }).join('');
 
   container.innerHTML = `
-    <!-- FILTER BAR -->
-    <div class="dash-filter-bar" id="dash-filter-bar">
-      <div class="dash-filter-item">
-        <span class="dash-filter-icon">🔍</span>
-        <input type="text" id="dash-filter-lot" placeholder="Tìm tên lô, mã lô, khách hàng..." value="${dashboardFilters.lotSearch}" autocomplete="off" />
-      </div>
-      <div class="dash-filter-item">
-        <span class="dash-filter-icon">🏭</span>
-        <input type="text" id="dash-filter-workshop" placeholder="Lọc theo xưởng may..." value="${dashboardFilters.workshopSearch}" autocomplete="off" list="dash-workshop-list" />
-        <datalist id="dash-workshop-list">
-          ${allWorkshops.map(w => `<option value="${w}">`).join('')}
-        </datalist>
-      </div>
-      <div class="dash-filter-item">
-        <span class="dash-filter-icon">📦</span>
-        <input type="text" id="dash-filter-material" placeholder="Lọc phụ liệu..." value="${dashboardFilters.materialSearch}" autocomplete="off" />
-      </div>
-      <button class="dash-filter-btn${dashboardFilters.prioOnly ? ' active' : ''}" id="dash-filter-prio" title="Chỉ hiện lô có size ưu tiên">
-        ⭐ Size Ưu Tiên
-      </button>
-      ${(dashboardFilters.lotSearch || dashboardFilters.workshopSearch || dashboardFilters.materialSearch || dashboardFilters.prioOnly) ? 
-        `<button class="dash-filter-clear" id="dash-filter-clear">✕ Xóa bộ lọc</button>` : ''}
-    </div>
-
     <!-- OVERVIEW STATS -->
     <div class="stat-row">
       <div class="stat-card blue">
@@ -419,35 +429,62 @@ export function renderDashboard() {
     </div>
   `;
 
-  // === Setup filter listeners ===
-  setupDashboardFilters();
-
   // Render chart
   if (chartSizes.length > 0) renderSizeChart(chartSizes, allSizeData);
 }
 
-function setupDashboardFilters() {
+function renderFilterBar(filterBarEl, allWorkshops) {
+  const workshopOptions = allWorkshops.map(w => `<option value="${w}" ${w === dashboardFilters.workshopSearch ? 'selected' : ''}>${w}</option>`).join('');
+  const hasFilter = dashboardFilters.lotSearch || dashboardFilters.workshopSearch || dashboardFilters.materialSearch || dashboardFilters.prioOnly;
+
+  filterBarEl.innerHTML = `
+    <div class="dash-filter-bar" id="dash-filter-bar-inner">
+      <div class="dash-filter-item">
+        <span class="dash-filter-icon">🔍</span>
+        <input type="text" id="dash-filter-lot" placeholder="Tìm tên lô, mã lô, khách hàng..." value="${dashboardFilters.lotSearch}" autocomplete="off" />
+      </div>
+      <div class="dash-filter-item dash-filter-select-wrapper">
+        <span class="dash-filter-icon">🏭</span>
+        <select id="dash-filter-workshop">
+          <option value="">-- Tất cả xưởng --</option>
+          ${workshopOptions}
+        </select>
+      </div>
+      <div class="dash-filter-item">
+        <span class="dash-filter-icon">📦</span>
+        <input type="text" id="dash-filter-material" placeholder="Lọc phụ liệu..." value="${dashboardFilters.materialSearch}" autocomplete="off" />
+      </div>
+      <button class="dash-filter-btn${dashboardFilters.prioOnly ? ' active' : ''}" id="dash-filter-prio" title="Chỉ hiện lô có size ưu tiên">
+        ⭐ Size Ưu Tiên
+      </button>
+      <button class="dash-filter-clear" id="dash-filter-clear" style="${hasFilter ? '' : 'display:none'}">✕ Xóa bộ lọc</button>
+    </div>
+  `;
+
+  // Setup listeners
   const lotInput = document.getElementById('dash-filter-lot');
-  const workshopInput = document.getElementById('dash-filter-workshop');
+  const workshopSelect = document.getElementById('dash-filter-workshop');
   const matInput = document.getElementById('dash-filter-material');
   const prioBtn = document.getElementById('dash-filter-prio');
   const clearBtn = document.getElementById('dash-filter-clear');
 
   let debounce = null;
-
-  const triggerFilter = () => {
+  const triggerTextFilter = () => {
     clearTimeout(debounce);
     debounce = setTimeout(() => {
       dashboardFilters.lotSearch = lotInput?.value || '';
-      dashboardFilters.workshopSearch = workshopInput?.value || '';
       dashboardFilters.materialSearch = matInput?.value || '';
       renderDashboard();
     }, 300);
   };
 
-  lotInput?.addEventListener('input', triggerFilter);
-  workshopInput?.addEventListener('input', triggerFilter);
-  matInput?.addEventListener('input', triggerFilter);
+  lotInput?.addEventListener('input', triggerTextFilter);
+  matInput?.addEventListener('input', triggerTextFilter);
+
+  workshopSelect?.addEventListener('change', () => {
+    dashboardFilters.workshopSearch = workshopSelect.value;
+    renderDashboard();
+  });
 
   prioBtn?.addEventListener('click', () => {
     dashboardFilters.prioOnly = !dashboardFilters.prioOnly;
@@ -456,6 +493,7 @@ function setupDashboardFilters() {
 
   clearBtn?.addEventListener('click', () => {
     dashboardFilters = { lotSearch: '', workshopSearch: '', materialSearch: '', prioOnly: false };
+    filtersRendered = false;
     renderDashboard();
   });
 }
