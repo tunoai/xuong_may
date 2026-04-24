@@ -284,6 +284,16 @@ class Store {
   getQCsBySewing(sewingId) { return this.data.qcRecords.filter(q => q.sewingId === sewingId); }
   getQCs() { return this.data.qcRecords; }
 
+  deleteQC(id) {
+    if (this.data.qcRecords) {
+      this.data.qcRecords = this.data.qcRecords.filter(q => q.id !== id);
+    }
+    if (this.data.qcResults) {
+      this.data.qcResults = this.data.qcResults.filter(r => r.qcId !== id);
+    }
+    this.save();
+  }
+
   // === QC RESULTS ===
   setQCResults(qcId, results) {
     this.data.qcResults = this.data.qcResults.filter(r => r.qcId !== qcId);
@@ -341,6 +351,13 @@ class Store {
   getRework(id) { return this.data.reworks.find(r => r.id === id); }
   getReworksByQC(qcId) { return this.data.reworks.filter(r => r.qcId === qcId); }
   getReworks() { return this.data.reworks; }
+
+  deleteRework(id) {
+    if (this.data.reworks) {
+      this.data.reworks = this.data.reworks.filter(r => r.id !== id);
+      this.save();
+    }
+  }
 
   // Auto-create rework entries from QC failures
   autoCreateReworks(qcId) {

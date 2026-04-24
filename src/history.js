@@ -70,6 +70,7 @@ export function renderHistory() {
         <td><strong style="color:var(--green)">${formatNumber(totalPassed)}</strong></td>
         <td>${qc.inspectorName || ''}</td>
         <td><span class="status-badge" style="background:rgba(34,197,94,0.15);color:var(--green)">QC Duyệt</span></td>
+        <td><button class="btn-icon" style="color:var(--red)" onclick="deleteHistoryRecord('${qc.id}', 'qc')" title="Xóa lịch sử này">🗑️</button></td>
       </tr>`
     });
   });
@@ -104,6 +105,7 @@ export function renderHistory() {
         <td><strong style="color:var(--blue)">${formatNumber(totalFixed)}</strong></td>
         <td>—</td>
         <td><span class="status-badge" style="background:rgba(59,130,246,0.15);color:var(--blue)">Sửa Lỗi Duyệt</span></td>
+        <td><button class="btn-icon" style="color:var(--red)" onclick="deleteHistoryRecord('${r.id}', 'rework')" title="Xóa lịch sử này">🗑️</button></td>
       </tr>`
     });
   });
@@ -128,6 +130,7 @@ export function renderHistory() {
           <th>Tổng SL</th>
           <th>Kiểm Tra</th>
           <th>Nguồn</th>
+          <th>Hành Động</th>
         </tr>
       </thead>
       <tbody>
@@ -135,4 +138,18 @@ export function renderHistory() {
       </tbody>
     </table>
   `;
+  `;
 }
+
+window.deleteHistoryRecord = (id, type) => {
+  if (!confirm('Bạn có chắc muốn xóa lịch sử giao hàng này? Thao tác này không thể hoàn tác.')) return;
+  
+  if (type === 'qc') {
+    store.deleteQC(id);
+  } else if (type === 'rework') {
+    store.deleteRework(id);
+  }
+  
+  renderHistory();
+  import('./ui.js').then(module => module.showToast('Đã xóa thành công lịch sử giao hàng.'));
+};
