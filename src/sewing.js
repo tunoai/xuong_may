@@ -591,7 +591,6 @@ function showQCModal(deliveryId, editQcId = null) {
 
   openModal(editQcId ? `Sửa QC - Thẻ Giao Hàng` : `Kiểm Tra QC - Thẻ Giao Hàng`, `
     <p style="margin-bottom:12px;color:var(--text-secondary);font-size:13px">Nhập kết quả QC cho thẻ giao hàng này:</p>
-    <div class="form-group"><label>Kiểm Viên *</label><input type="text" id="qc-inspector" value="${existingQc ? existingQc.inspectorName : ''}" placeholder="Tên kiểm viên" /></div>
     <table class="size-entry-table" style="margin-top:12px">
       <thead><tr><th>Size</th><th>Tổng Giao</th><th>✅ Duyệt (Pass)</th><th>❌ Gửi Trả (Fail)</th></tr></thead>
       <tbody>${sizeRows}</tbody>
@@ -629,8 +628,6 @@ function showQCModal(deliveryId, editQcId = null) {
   });
 
   document.getElementById('btn-confirm-qc').addEventListener('click', () => {
-    const inspector = document.getElementById('qc-inspector').value.trim();
-    if (!inspector) { showToast('Vui lòng nhập tên kiểm viên', 'error'); return; }
 
     let valid = true;
     const results = sizes.map(s => {
@@ -650,7 +647,7 @@ function showQCModal(deliveryId, editQcId = null) {
     }
 
     if (editQcId) {
-      store.updateQC(editQcId, { inspectorName: inspector });
+      store.updateQC(editQcId, {});
       store.setQCResults(editQcId, results);
       showToast('Đã cập nhật kết quả QC!');
     } else {
@@ -659,7 +656,7 @@ function showQCModal(deliveryId, editQcId = null) {
         sewingId: sewing.id,
         deliveryId: delivery.id,
         dateQC: new Date().toISOString().split('T')[0],
-        inspectorName: inspector,
+        inspectorName: '',
         notes: ''
       });
       store.setQCResults(savedQC.id, results);

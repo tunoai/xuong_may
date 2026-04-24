@@ -108,7 +108,6 @@ function qcFormHTML(qc = {}, existingResults = []) {
   return `<div class="form-grid">
     <div class="form-group"><label>Đơn May *</label><select id="qc-sewing">${sewOpts}</select></div>
     <div class="form-group"><label>Ngày QC *</label><input type="date" id="qc-date" value="${qc.dateQC || new Date().toISOString().split('T')[0]}" /></div>
-    <div class="form-group"><label>Kiểm Viên *</label><input type="text" id="qc-inspector" value="${qc.inspectorName || ''}" /></div>
     <div class="form-group full"><label>Ghi Chú</label><textarea id="qc-notes">${qc.notes || ''}</textarea></div>
   </div>
   <div style="margin-top:16px">
@@ -175,7 +174,7 @@ function getQCFormData() {
     qc: {
       sewingId: document.getElementById('qc-sewing').value,
       dateQC: document.getElementById('qc-date').value,
-      inspectorName: document.getElementById('qc-inspector').value.trim(),
+      inspectorName: '',
       notes: document.getElementById('qc-notes').value.trim()
     },
     results
@@ -206,7 +205,7 @@ function showAddQCModal() {
 
   document.getElementById('btn-save-qc').addEventListener('click', () => {
     const { qc, results } = getQCFormData();
-    if (!qc.sewingId || !qc.inspectorName) { showToast('Vui lòng điền đầy đủ', 'error'); return; }
+    if (!qc.sewingId) { showToast('Đơn may không hợp lệ', 'error'); return; }
     const saved = store.addQC(qc);
     store.setQCResults(saved.id, results);
     store.autoCreateReworks(saved.id);
@@ -263,7 +262,6 @@ function showQCDetail(qcId) {
         <div class="detail-info-item"><div class="label">Đơn May</div><div class="value">${qc.sewingId}</div></div>
         <div class="detail-info-item"><div class="label">Lô Vải</div><div class="value">${lot ? lotLabel(lot) : '—'}</div></div>
         <div class="detail-info-item"><div class="label">Ngày QC</div><div class="value">${formatDate(qc.dateQC)}</div></div>
-        <div class="detail-info-item"><div class="label">Kiểm Viên</div><div class="value">${qc.inspectorName}</div></div>
         <div class="detail-info-item"><div class="label">Tổng Kiểm</div><div class="value">${totalChecked}</div></div>
         <div class="detail-info-item"><div class="label">Đạt</div><div class="value" style="color:var(--green)">${totalPassed}</div></div>
         <div class="detail-info-item"><div class="label">Lỗi</div><div class="value" style="color:var(--red)">${totalFailed}</div></div>

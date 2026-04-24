@@ -6,6 +6,13 @@ Chart.register(...registerables);
 
 let sizeChart = null;
 
+// === FILTER STATE ===
+let dashboardFilters = {
+  lotSearch: '',
+  workshopSearch: '',
+  prioOnly: false
+};
+
 export function renderDashboard() {
   const lots = store.getLots();
   const container = document.getElementById('dashboard-content');
@@ -19,82 +26,8 @@ export function renderDashboard() {
     return;
   }
 
-  // === Build per-lot detail table ===
-  const lotTableRows = lots.map(lot => {
-    const summary = store.getLotSummary(lot.id);
-    if (!summary) return '';
-    const sizeBreak = store.getSizeBreakdownByLot(lot.id);
-    const prioSizes = store.getPrioritySizes(lot.id);
-    const progress = summary.totalCut > 0 ? Math.round((summary.totalPassed / summary.totalCut) * 100) : 0;
-
-    const sizeColumns = sizeBreak.map(s => {
-      const isPrio = prioSizes.includes(s.size);
-      return `<div style="display:inline-block;margin:2px 4px;padding:3px 8px;border-radius:4px;font-size:11px;
-        background:${isPrio ? 'rgba(255,170,0,0.15)' : 'var(--bg-secondary)'};
-        border:1px solid ${isPrio ? 'var(--yellow)' : 'var(--border)'}">
-        <strong>${isPrio ? '⭐' : ''}${s.size}</strong>
-        <span style="color:var(--blue)">C:${s.cut}</span>
-        <span style="color:var(--orange)">M:${s.returned}</span>
-        <span style="color:var(--green)">P:${s.passed}</span>
-        ${s.failed > 0 ? `<span style="color:var(--red)">F:${s.failed}</span>` : ''}
-      </div>`;
-    }).join('');
-
-    return `<tr>
-      <td><strong>${lot.id}</strong><div style="font-size:11px;color:var(--text-muted)">${lot.customerName}</div></td>
-      <td>${lot.fabricName}<div style="font-size:11px;color:var(--text-muted)">${lot.color}</div></td>
-      <td>${formatDate(lot.dateReceived)}</td>
-      <td>${priorityBadge(lot.priority)}</td>
-      <td>${statusBadge(lot.status)}</td>
-      <td>${formatNumber(lot.totalFabric)}m</td>
-      <td>${formatNumber(summary.totalCut)}</td>
-      <td>${formatNumber(summary.totalReturned)}</td>
-      <td style="color:var(--green)">${formatNumber(summary.totalPassed)}</td>
-      <td style="color:var(--red)">${formatNumber(summary.totalFailed)}</td>
-      <td>
-        <div style="display:flex;align-items:center;gap:6px">
-          <div class="progress-bar-bg" style="width:60px;height:6px">
-            <div class="progress-bar-fill" style="width:${progress}%"></div>
-          </div>
-          <span style="font-size:11px;font-weight:600">${progress}%</span>
-        </div>
-      </td>
-      <td style="white-space:normal;max-width:400px">${sizeColumns}</td>
-    </tr>`;
-  }).join('');
-
-  // === Priority Size Tracking ===
-  const prioTrackingRows = [];
-  lots.forEach(lot => {
-    const prioSizes = store.getPrioritySizes(lot.id);
-    if (prioSizes.length === 0) return;
-    const sizeBreak = store.getSizeBreakdownByLot(lot.id);
-
-    prioSizes.forEach(size => {
-      const data = sizeBreak.find(s => s.size === size);
-      if (!data) return;
-
-      let stage = 'Chưa bắt đầu';
-      let stageColor = 'var(--text-muted)';
-      if (data.passed > 0) { stage = '✅ QC Passed'; stageColor = 'var(--green)'; }
-      else if (data.returned > 0) { stage = '🔍 Đang QC'; stageColor = 'var(--blue)'; }
-      else if (data.inProgress > 0) { stage = '🪡 Đang May'; stageColor = 'var(--yellow)'; }
-      else if (data.sent > 0) { stage = '🪡 Gửi May'; stageColor = 'var(--orange)'; }
-      else if (data.cut > 0) { stage = '✂️ Đã Cắt'; stageColor = 'var(--blue)'; }
-
-      prioTrackingRows.push(`<tr>
-        <td><strong>${lot.id}</strong> <span style="color:var(--text-muted);font-size:11px">${lot.customerName}</span></td>
-        <td><strong>⭐ ${size}</strong></td>
-        <td>${data.cut}</td>
-        <td>${data.sent}</td>
-        <td>${data.returned}</td>
-        <td style="color:var(--green)">${data.passed}</td>
-        <td style="color:var(--red)">${data.failed}</td>
-        <td style="color:${stageColor};font-weight:600">${stage}</td>
-        <td style="color:${data.missing > 0 ? 'var(--red)' : 'var(--green)'}; font-weight:600">${data.missing}</td>
-      </tr>`);
-    });
-  });
+  // === Collect unique workshops ===
+  const allWorkshops = [...new Set(store.getSewings().map(s => s.workshopName).filter(Boolean))];
 
   // === Alerts ===
   const alerts = [];
@@ -117,9 +50,210 @@ export function renderDashboard() {
     alerts.push({ type: 'danger', icon: '🔄', text: `${unresolvedReworks.length} hàng lỗi chưa xử lý xong` });
   }
 
+  // === Apply filters ===
+  const filteredLots = lots.filter(lot => {
+    const prioSizes = store.getPrioritySizes(lot.id);
+    if (dashboardFilters.prioOnly && prioSizes.length === 0) return false;
+    if (dashboardFilters.lotSearch) {
+      const q = dashboardFilters.lotSearch.toLowerCase();
+      const searchStr = `${lot.id} ${lot.fabricName || ''} ${lot.customerName || ''} ${lot.color || ''}`.toLowerCase();
+      if (!searchStr.includes(q)) return false;
+    }
+    if (dashboardFilters.workshopSearch) {
+      const q = dashboardFilters.workshopSearch.toLowerCase();
+      const lotSewings = store.getSewingsByLot(lot.id);
+      const hasWorkshop = lotSewings.some(s => (s.workshopName || '').toLowerCase().includes(q));
+      if (!hasWorkshop) return false;
+    }
+    return true;
+  });
+
+  // === Build lot cards ===
+  const lotCards = filteredLots.map(lot => {
+    const summary = store.getLotSummary(lot.id);
+    if (!summary) return '';
+    const sizeBreak = store.getSizeBreakdownByLot(lot.id);
+    const prioSizes = store.getPrioritySizes(lot.id);
+    const hasPrio = prioSizes.length > 0;
+    const progress = summary.totalCut > 0 ? Math.round((summary.totalPassed / summary.totalCut) * 100) : 0;
+    const remaining = summary.totalCut - summary.totalPassed - summary.totalFailed;
+    const inSewing = summary.totalSent - summary.totalReturned;
+
+    // Find workshops holding this lot
+    const lotSewings = store.getSewingsByLot(lot.id);
+    const workshopNames = [...new Set(lotSewings.map(s => s.workshopName).filter(Boolean))];
+
+    const sizeChips = sizeBreak.map(s => {
+      const isPrio = prioSizes.includes(s.size);
+      return `<div class="dash-size-chip${isPrio ? ' prio' : ''}">
+        <span class="dash-size-label">${isPrio ? '⭐ ' : ''}${s.size}</span>
+        <div class="dash-size-nums">
+          <span class="sz-cut" title="Cắt">C:${s.cut}</span>
+          <span class="sz-sew" title="Đang may">${s.inProgress > 0 ? `M:${s.inProgress}` : ''}</span>
+          <span class="sz-pass" title="Pass">P:${s.passed}</span>
+          ${s.failed > 0 ? `<span class="sz-fail" title="Fail">F:${s.failed}</span>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div class="dash-lot-card${hasPrio ? ' dash-prio' : ''}">
+      <div class="dash-lot-header">
+        <div class="dash-lot-id">
+          <span class="dash-lot-code">${lot.id}</span>
+          ${statusBadge(lot.status)}
+        </div>
+        <div class="dash-lot-priority">${priorityBadge(lot.priority)}</div>
+      </div>
+      <div class="dash-lot-info">
+        <div class="dash-lot-fabric">
+          <span class="dash-fabric-icon">🧵</span>
+          <div>
+            <div class="dash-fabric-name">${lot.fabricName || '—'}${lot.color ? ` · ${lot.color}` : ''}</div>
+            <div class="dash-fabric-customer">${lot.customerName || '—'}</div>
+          </div>
+        </div>
+        <div class="dash-lot-meta">
+          <span>📅 ${formatDate(lot.dateReceived)}</span>
+          <span>📏 ${formatNumber(lot.totalFabric)}m</span>
+        </div>
+      </div>
+
+      <div class="dash-progress-section">
+        <div class="dash-progress-header">
+          <span>Tiến độ tổng</span>
+          <span class="dash-progress-pct">${progress}%</span>
+        </div>
+        <div class="dash-progress-track">
+          <div class="dash-progress-fill" style="width:${progress}%"></div>
+        </div>
+      </div>
+
+      <div class="dash-stats-row">
+        <div class="dash-stat-mini blue">
+          <div class="dash-stat-mini-val">${formatNumber(summary.totalCut)}</div>
+          <div class="dash-stat-mini-lbl">Tổng Cắt</div>
+        </div>
+        <div class="dash-stat-mini orange">
+          <div class="dash-stat-mini-val">${formatNumber(inSewing > 0 ? inSewing : 0)}</div>
+          <div class="dash-stat-mini-lbl">Đang May</div>
+        </div>
+        <div class="dash-stat-mini cyan">
+          <div class="dash-stat-mini-val">${formatNumber(summary.totalReturned)}</div>
+          <div class="dash-stat-mini-lbl">Đã Giao</div>
+        </div>
+        <div class="dash-stat-mini green">
+          <div class="dash-stat-mini-val">${formatNumber(summary.totalPassed)}</div>
+          <div class="dash-stat-mini-lbl">QC Pass</div>
+        </div>
+        <div class="dash-stat-mini red">
+          <div class="dash-stat-mini-val">${formatNumber(summary.totalFailed)}</div>
+          <div class="dash-stat-mini-lbl">Lỗi</div>
+        </div>
+        <div class="dash-stat-mini yellow">
+          <div class="dash-stat-mini-val">${formatNumber(remaining > 0 ? remaining : 0)}</div>
+          <div class="dash-stat-mini-lbl">Còn Lại</div>
+        </div>
+      </div>
+
+      ${workshopNames.length > 0 ? `<div class="dash-workshops">
+        <span class="dash-workshop-icon">🏭</span>
+        ${workshopNames.map(w => `<span class="dash-workshop-tag">${w}</span>`).join('')}
+      </div>` : ''}
+
+      <div class="dash-sizes-section">
+        <div class="dash-sizes-title">Chi tiết size</div>
+        <div class="dash-sizes-grid">${sizeChips}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // === Build Workshop Summary Cards ===
+  const workshopCards = allWorkshops.map(workshopName => {
+    const workshopSewings = store.getSewings().filter(s => s.workshopName === workshopName);
+    
+    // Apply filter
+    if (dashboardFilters.workshopSearch) {
+      const q = dashboardFilters.workshopSearch.toLowerCase();
+      if (!workshopName.toLowerCase().includes(q)) return '';
+    }
+
+    let totalHolding = 0;
+    let totalDefects = 0;
+    const lotMap = {};
+
+    workshopSewings.forEach(sewing => {
+      const lot = store.getLot(sewing.lotId);
+      const sizes = store.getSewingSizes(sewing.id);
+      const inProgress = sizes.reduce((sum, sz) => sum + Math.max(0, sz.quantitySent - sz.quantityReturned), 0);
+      totalHolding += inProgress;
+
+      // Get defects for this sewing
+      const qcRecords = store.getQCsBySewing(sewing.id);
+      const defects = qcRecords.reduce((sum, qc) => {
+        const results = store.getQCResults(qc.id);
+        return sum + results.reduce((s, r) => s + r.failed, 0);
+      }, 0);
+      totalDefects += defects;
+
+      const lotKey = sewing.lotId;
+      if (!lotMap[lotKey]) {
+        lotMap[lotKey] = {
+          lot,
+          totalSent: 0,
+          totalReturned: 0,
+          inProgress: 0,
+          defects: 0
+        };
+      }
+      lotMap[lotKey].totalSent += sizes.reduce((sum, sz) => sum + sz.quantitySent, 0);
+      lotMap[lotKey].totalReturned += sizes.reduce((sum, sz) => sum + sz.quantityReturned, 0);
+      lotMap[lotKey].inProgress += inProgress;
+      lotMap[lotKey].defects += defects;
+    });
+
+    const lotEntries = Object.values(lotMap).filter(e => {
+      if (dashboardFilters.lotSearch) {
+        const q = dashboardFilters.lotSearch.toLowerCase();
+        const searchStr = `${e.lot?.id || ''} ${e.lot?.fabricName || ''} ${e.lot?.customerName || ''}`.toLowerCase();
+        if (!searchStr.includes(q)) return false;
+      }
+      return true;
+    });
+
+    if (lotEntries.length === 0 && dashboardFilters.lotSearch) return '';
+
+    const lotRows = lotEntries.map(e => `
+      <div class="ws-lot-row">
+        <div class="ws-lot-name">
+          <strong>${e.lot ? e.lot.id : '?'}</strong>
+          <span>${e.lot ? e.lot.fabricName : ''}</span>
+        </div>
+        <div class="ws-lot-nums">
+          <span class="ws-num blue" title="Đang giữ">${e.inProgress} pcs</span>
+          <span class="ws-num green" title="Đã giao">${e.totalReturned}</span>
+          ${e.defects > 0 ? `<span class="ws-num red" title="Lỗi">${e.defects} lỗi</span>` : ''}
+        </div>
+      </div>
+    `).join('');
+
+    return `<div class="dash-workshop-card">
+      <div class="ws-header">
+        <div class="ws-name">
+          <span class="ws-icon">🏭</span>
+          <span>${workshopName}</span>
+        </div>
+        <div class="ws-badge-row">
+          <span class="ws-stat-badge blue">${totalHolding} đang may</span>
+          ${totalDefects > 0 ? `<span class="ws-stat-badge red">${totalDefects} lỗi</span>` : `<span class="ws-stat-badge green">0 lỗi</span>`}
+        </div>
+      </div>
+      <div class="ws-lots">${lotRows}</div>
+    </div>`;
+  }).filter(Boolean).join('');
+
   // === Chart data ===
   const allSizeData = {};
-  lots.forEach(lot => {
+  filteredLots.forEach(lot => {
     const sizeBreak = store.getSizeBreakdownByLot(lot.id);
     sizeBreak.forEach(s => {
       if (!allSizeData[s.size]) allSizeData[s.size] = { cut: 0, returned: 0, passed: 0 };
@@ -131,43 +265,127 @@ export function renderDashboard() {
   const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL'];
   const chartSizes = [...sizeOrder.filter(s => allSizeData[s]), ...Object.keys(allSizeData).filter(s => !sizeOrder.includes(s))];
 
+  // === Build main stat cards ===
+  let totalCutAll = 0, totalSewingAll = 0, totalReturnedAll = 0, totalPassedAll = 0, totalFailedAll = 0;
+  filteredLots.forEach(lot => {
+    const summary = store.getLotSummary(lot.id);
+    if (!summary) return;
+    totalCutAll += summary.totalCut;
+    totalSewingAll += Math.max(0, summary.totalSent - summary.totalReturned);
+    totalReturnedAll += summary.totalReturned;
+    totalPassedAll += summary.totalPassed;
+    totalFailedAll += summary.totalFailed;
+  });
+  const overallProgress = totalCutAll > 0 ? Math.round((totalPassedAll / totalCutAll) * 100) : 0;
+
   container.innerHTML = `
+    <!-- FILTER BAR -->
+    <div class="dash-filter-bar" id="dash-filter-bar">
+      <div class="dash-filter-item">
+        <span class="dash-filter-icon">🔍</span>
+        <input type="text" id="dash-filter-lot" placeholder="Tìm tên lô, mã lô, khách hàng..." value="${dashboardFilters.lotSearch}" autocomplete="off" />
+      </div>
+      <div class="dash-filter-item">
+        <span class="dash-filter-icon">🏭</span>
+        <input type="text" id="dash-filter-workshop" placeholder="Lọc theo xưởng may..." value="${dashboardFilters.workshopSearch}" autocomplete="off" list="dash-workshop-list" />
+        <datalist id="dash-workshop-list">
+          ${allWorkshops.map(w => `<option value="${w}">`).join('')}
+        </datalist>
+      </div>
+      <button class="dash-filter-btn${dashboardFilters.prioOnly ? ' active' : ''}" id="dash-filter-prio" title="Chỉ hiện lô có size ưu tiên">
+        ⭐ Size Ưu Tiên
+      </button>
+      ${(dashboardFilters.lotSearch || dashboardFilters.workshopSearch || dashboardFilters.prioOnly) ? 
+        `<button class="dash-filter-clear" id="dash-filter-clear">✕ Xóa bộ lọc</button>` : ''}
+    </div>
+
+    <!-- OVERVIEW STATS -->
+    <div class="stat-row">
+      <div class="stat-card blue">
+        <div class="stat-label">Tổng Đã Cắt</div>
+        <div class="stat-value">${formatNumber(totalCutAll)}<span class="stat-unit">pcs</span></div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-label">Đang May</div>
+        <div class="stat-value">${formatNumber(totalSewingAll)}<span class="stat-unit">pcs</span></div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-label">QC Đạt</div>
+        <div class="stat-value">${formatNumber(totalPassedAll)}<span class="stat-unit">pcs</span></div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-label">Hàng Lỗi</div>
+        <div class="stat-value">${formatNumber(totalFailedAll)}<span class="stat-unit">pcs</span></div>
+      </div>
+      <div class="stat-card yellow">
+        <div class="stat-label">Tiến Độ Chung</div>
+        <div class="stat-value">${overallProgress}<span class="stat-unit">%</span></div>
+      </div>
+    </div>
+
     <!-- Alerts -->
     ${alerts.length > 0 ? `<div class="dashboard-section">
       <h3>🚨 Cảnh Báo (${alerts.length})</h3>
       <ul class="alert-list">${alerts.map(a => `<li class="alert-item ${a.type}">${a.icon} ${a.text}</li>`).join('')}</ul>
     </div>` : ''}
 
-    <!-- Priority Size Tracking -->
-    ${prioTrackingRows.length > 0 ? `<div class="dashboard-section">
-      <h3>⭐ Size Ưu Tiên - Đang Ở Đâu?</h3>
-      <div class="table-wrapper"><table>
-        <thead><tr><th>Lô</th><th>Size</th><th>Cắt</th><th>Gửi May</th><th>Nhận Lại</th><th>QC Pass</th><th>QC Fail</th><th>Đang Ở</th><th>Thiếu</th></tr></thead>
-        <tbody>${prioTrackingRows.join('')}</tbody>
-      </table></div>
+    <!-- Workshop Summary -->
+    ${workshopCards ? `<div class="dashboard-section">
+      <h3>🏭 Tổng Hợp Theo Xưởng May</h3>
+      <div class="dash-workshop-scroll">${workshopCards}</div>
     </div>` : ''}
 
-    <!-- Per-Lot Detail Table -->
+    <!-- Lot Cards -->
     <div class="dashboard-section">
-      <h3>📋 Chi Tiết Từng Lô</h3>
-      <div class="table-wrapper" style="overflow-x:auto"><table>
-        <thead><tr>
-          <th>Lô</th><th>Vải</th><th>Ngày Nhận</th><th>Ưu Tiên</th><th>Trạng Thái</th>
-          <th>Tổng Vải</th><th>Tổng Cắt</th><th>May Trả</th><th>QC Pass</th><th>QC Fail</th><th>Tiến Độ</th><th>Chi Tiết Size (C=Cắt M=May P=Pass F=Fail)</th>
-        </tr></thead>
-        <tbody>${lotTableRows}</tbody>
-      </table></div>
+      <h3>📋 Chi Tiết Từng Lô <span class="dash-count-badge">${filteredLots.length} lô</span></h3>
+      <div class="dash-lot-scroll">
+        ${lotCards || '<div class="empty-state"><p>Không tìm thấy lô vải phù hợp</p></div>'}
+      </div>
     </div>
 
     <!-- Chart -->
     ${chartSizes.length > 0 ? `<div class="dashboard-section">
-      <h3>📊 So Sánh Tổng Theo Size (Tất Cả Lô)</h3>
+      <h3>📊 So Sánh Tổng Theo Size</h3>
       <div class="chart-container"><canvas id="chart-size"></canvas></div>
     </div>` : ''}
   `;
 
+  // === Setup filter listeners ===
+  setupDashboardFilters();
+
   // Render chart
   if (chartSizes.length > 0) renderSizeChart(chartSizes, allSizeData);
+}
+
+function setupDashboardFilters() {
+  const lotInput = document.getElementById('dash-filter-lot');
+  const workshopInput = document.getElementById('dash-filter-workshop');
+  const prioBtn = document.getElementById('dash-filter-prio');
+  const clearBtn = document.getElementById('dash-filter-clear');
+
+  let debounce = null;
+
+  const triggerFilter = () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => {
+      dashboardFilters.lotSearch = lotInput?.value || '';
+      dashboardFilters.workshopSearch = workshopInput?.value || '';
+      renderDashboard();
+    }, 300);
+  };
+
+  lotInput?.addEventListener('input', triggerFilter);
+  workshopInput?.addEventListener('input', triggerFilter);
+
+  prioBtn?.addEventListener('click', () => {
+    dashboardFilters.prioOnly = !dashboardFilters.prioOnly;
+    renderDashboard();
+  });
+
+  clearBtn?.addEventListener('click', () => {
+    dashboardFilters = { lotSearch: '', workshopSearch: '', prioOnly: false };
+    renderDashboard();
+  });
 }
 
 function renderSizeChart(sizes, sizeData) {
