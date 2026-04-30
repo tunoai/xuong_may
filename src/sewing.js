@@ -31,6 +31,14 @@ export function initSewingModule() {
 
   // Event Delegation
   container.addEventListener('click', (e) => {
+    // Batch Deliver (Nhập hàng may xong)
+    const batchDeliverBtn = e.target.closest('.btn-batch-deliver');
+    if (batchDeliverBtn) {
+      e.stopPropagation();
+      showBatchDeliveryModal();
+      return;
+    }
+
     // Deliver (Giao hàng)
     const deliverBtn = e.target.closest('.btn-sew-deliver');
     if (deliverBtn) {
@@ -135,8 +143,11 @@ export function initSewingModule() {
   });
 
   window.handleSewingDragStart = (e) => {
-    e.dataTransfer.setData('text/plain', e.target.dataset.deliveryId);
-    e.target.classList.add('dragging');
+    const card = e.target.closest('[data-delivery-id]');
+    if (!card) return;
+    e.dataTransfer.setData('text/plain', card.dataset.deliveryId);
+    e.dataTransfer.setData('application/group-date', card.dataset.groupDate || '');
+    card.classList.add('dragging');
   };
 
   window.handleSewingDragOver = (e) => { e.preventDefault(); };
@@ -144,18 +155,34 @@ export function initSewingModule() {
   window.handleSewingDrop = (e, targetCol) => {
     e.preventDefault();
     const deliveryId = e.dataTransfer.getData('text/plain');
+    const groupDate = e.dataTransfer.getData('application/group-date');
     document.querySelector(`[data-delivery-id="${deliveryId}"]`)?.classList.remove('dragging');
     
-    if (!deliveryId) return; // Ignore drag from other boards
+    if (!deliveryId) return;
     const delivery = store.getDelivery(deliveryId);
     if (!delivery) return;
 
-    if (targetCol === 'qc' && delivery.status === 'Delivery') {
-      store.updateDelivery(deliveryId, { status: 'QC' });
-      renderSewingTable();
-    } else if (targetCol === 'delivery' && delivery.status === 'QC') {
-      store.updateDelivery(deliveryId, { status: 'Delivery' });
-      renderSewingTable();
+    if (groupDate) {
+      const allDels = store.getDeliveries();
+      const groupDels = allDels.filter(d => {
+        const dk = d.deliveryDate || d.createdAt.split('T')[0];
+        return dk === groupDate && d.status === delivery.status;
+      });
+      if (targetCol === 'qc' && delivery.status === 'Delivery') {
+        groupDels.forEach(d => store.updateDelivery(d.id, { status: 'QC' }));
+        renderSewingTable();
+      } else if (targetCol === 'delivery' && delivery.status === 'QC') {
+        groupDels.forEach(d => store.updateDelivery(d.id, { status: 'Delivery' }));
+        renderSewingTable();
+      }
+    } else {
+      if (targetCol === 'qc' && delivery.status === 'Delivery') {
+        store.updateDelivery(deliveryId, { status: 'QC' });
+        renderSewingTable();
+      } else if (targetCol === 'delivery' && delivery.status === 'QC') {
+        store.updateDelivery(deliveryId, { status: 'Delivery' });
+        renderSewingTable();
+      }
     }
   };
 
@@ -359,11 +386,12 @@ export function renderSewingTable() {
         <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
           <span>MAY XONG</span> <span class="badge" style="background:var(--orange)">${deliveriesPending.length}</span>
         </div>
+        <button class="btn btn-xs btn-batch-deliver" style="margin-top:6px;width:100%;background:linear-gradient(135deg,#f59e0b,#ef4444);border:none;color:#fff;font-weight:600;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;gap:4px;transition:all .2s;box-shadow:0 2px 8px rgba(245,158,11,0.3)">📋 Nhập hàng may xong</button>
       </div>
       <div style="font-size:11px; font-style:italic; color:var(--text-muted); padding: 0 12px 8px;">Khi nào tiến hành QC thì kéo sang cột QC</div>
       <div class="kanban-cards">
-        ${deliveriesPending.map(d => renderDeliveryCard(d, false)).join('')}
-        ${deliveriesPending.length === 0 ? '<div style="text-align:center;color:var(--text-muted);font-size:12px;padding:20px;">Bấm "Giao hàng" để tạo thẻ</div>' : ''}
+        ${renderGroupedDeliveries(deliveriesPending)}
+        ${deliveriesPending.length === 0 ? '<div style="text-align:center;color:var(--text-muted);font-size:12px;padding:20px;">Bấm "Nhập hàng may xong" để tạo thẻ</div>' : ''}
       </div>
     </div>
 
@@ -676,5 +704,243 @@ function showQCModal(deliveryId, editQcId = null) {
 
     closeModal();
     renderSewingTable();
+  });
+}
+
+// === GROUPED DELIVERY RENDERING (by date) ===
+function renderGroupedDeliveries(deliveries) {
+  if (deliveries.length === 0) return '';
+  const groups = {};
+  deliveries.forEach(d => {
+    const dateKey = d.deliveryDate || d.createdAt.split('T')[0];
+    if (!groups[dateKey]) groups[dateKey] = [];
+    groups[dateKey].push(d);
+  });
+  const sortedDates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+
+  return sortedDates.map(dateKey => {
+    const group = groups[dateKey];
+    const rows = [];
+    group.forEach(d => {
+      const sewing = store.getSewing(d.sewingId);
+      const lot = sewing ? store.getLot(sewing.lotId) : null;
+      const sizes = store.getDeliverySizes(d.id);
+      const productName = lot ? (lot.fabricName || '') + (lot.color ? ' ' + lot.color : '') : d.sewingId;
+      const customerName = lot ? lot.customerName : '';
+      const sizeMap = {};
+      sizes.forEach(s => { sizeMap[s.size] = s.quantity; });
+      rows.push({ deliveryId: d.id, productName, customerName, sizeMap });
+    });
+
+    const allSizesUsed = new Set();
+    rows.forEach(r => Object.keys(r.sizeMap).forEach(s => allSizesUsed.add(s)));
+    const sizeOrder = ALL_SIZES.filter(s => allSizesUsed.has(s));
+
+    const headerCells = sizeOrder.map(s => `<th style="padding:4px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:center;">${s}</th>`).join('');
+    const bodyRows = rows.map(r => {
+      const cells = sizeOrder.map(s => {
+        const qty = r.sizeMap[s] || 0;
+        return `<td style="padding:3px 8px;text-align:center;font-size:12px;${qty > 0 ? 'color:var(--text-primary);font-weight:500' : 'color:var(--text-muted);opacity:0.3'}">${qty > 0 ? qty : ''}</td>`;
+      }).join('');
+      return `<tr>
+        <td style="padding:3px 8px;font-size:12px;color:var(--text-primary);max-width:140px;overflow:hidden;text-overflow:ellipsis;" title="${r.productName} - ${r.customerName}">
+          <span style="font-weight:500">${r.productName}</span>
+          ${r.customerName ? `<br/><span style="font-size:10px;color:var(--text-muted)">${r.customerName}</span>` : ''}
+        </td>${cells}</tr>`;
+    }).join('');
+
+    const totalRow = sizeOrder.map(s => {
+      const total = rows.reduce((sum, r) => sum + (r.sizeMap[s] || 0), 0);
+      return `<td style="padding:4px 8px;text-align:center;font-size:12px;font-weight:700;color:var(--orange);border-top:1px solid rgba(255,255,255,0.1)">${total > 0 ? total : ''}</td>`;
+    }).join('');
+    const grandTotal = rows.reduce((sum, r) => sum + Object.values(r.sizeMap).reduce((a, b) => a + b, 0), 0);
+    const firstDeliveryId = group[0].id;
+
+    return `
+      <div class="kanban-card" draggable="true" data-delivery-id="${firstDeliveryId}" data-group-date="${dateKey}" ondragstart="handleSewingDragStart(event)" style="border-left:3px solid var(--orange)">
+        <div class="kanban-card-title" style="margin-bottom:6px">
+          <span style="font-size:13px;font-weight:700;color:var(--orange)">📦 Giao hàng ${formatDate(dateKey)}</span>
+          <span style="font-size:11px;color:var(--text-muted);background:rgba(245,158,11,0.15);padding:2px 8px;border-radius:10px;font-weight:600">${grandTotal} sp</span>
+        </div>
+        <div style="overflow-x:auto;margin-bottom:8px;">
+          <table style="width:100%;border-collapse:collapse;">
+            <thead><tr style="border-bottom:1px solid rgba(255,255,255,0.08)">
+              <th style="padding:4px 8px;font-size:11px;color:var(--text-muted);font-weight:600;text-align:left;">Sản phẩm</th>
+              ${headerCells}
+            </tr></thead>
+            <tbody>${bodyRows}
+              <tr><td style="padding:4px 8px;font-size:11px;font-weight:700;color:var(--text-muted)">TỔNG</td>${totalRow}</tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap;">
+          ${group.map(d => `<button class="btn-icon btn-edit-delivery" data-delivery-id="${d.id}" title="Sửa" style="padding:2px 4px;font-size:11px;color:var(--text-muted)">✏️</button><button class="btn-icon btn-delete-delivery" data-delivery-id="${d.id}" title="Xóa" style="padding:2px 4px;font-size:11px;color:var(--red)">🗑️</button>`).join('')}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// === BATCH DELIVERY MODAL ===
+function showBatchDeliveryModal() {
+  const activeSewings = store.getSewings().filter(s => s.status !== 'Done');
+  if (activeSewings.length === 0) { showToast('Không có lô vải nào đang may', 'error'); return; }
+
+  const sewingOptions = activeSewings.map(s => {
+    const lot = store.getLot(s.lotId);
+    const sizes = store.getSewingSizes(s.id);
+    const remaining = sizes.reduce((sum, sz) => sum + Math.max(0, sz.quantitySent - sz.quantityReturned), 0);
+    const label = lot ? `${lot.fabricName || ''}${lot.color ? ' ' + lot.color : ''} - ${lot.customerName || ''} (còn ${remaining})` : s.id;
+    return { id: s.id, label, remaining };
+  }).filter(o => o.remaining > 0);
+
+  if (sewingOptions.length === 0) { showToast('Tất cả lô vải đã giao xong', 'info'); return; }
+
+  const today = new Date().toISOString().split('T')[0];
+  const datalistOptionsHTML = sewingOptions.map(o => `<option value="${o.id}" label="${o.label}">${o.label}</option>`).join('');
+
+  openModal('📋 Nhập Hàng May Xong', `
+    <div style="margin-bottom:16px;">
+      <label style="font-size:13px;color:var(--text-secondary);font-weight:600;display:block;margin-bottom:6px;">Ngày giao hàng *</label>
+      <input type="date" id="batch-delivery-date" value="${today}" required style="width:200px;padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:var(--bg-secondary);color:var(--text-primary);font-size:13px;" />
+    </div>
+    <p style="margin-bottom:12px;color:var(--text-secondary);font-size:13px">Chọn sản phẩm và nhập số lượng theo từng size:</p>
+    <div style="overflow-x:auto;max-height:400px;overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;" id="batch-delivery-table">
+        <thead><tr style="background:rgba(255,255,255,0.03);position:sticky;top:0;z-index:1;">
+          <th style="padding:8px;font-size:12px;color:#b8a07a;font-weight:600;text-align:left;min-width:200px;">Sản phẩm (Lô vải)</th>
+          ${ALL_SIZES.map(s => `<th style="padding:8px;font-size:12px;color:#b8a07a;font-weight:600;text-align:center;">${s}</th>`).join('')}
+          <th style="padding:8px;width:30px;"></th>
+        </tr></thead>
+        <tbody id="batch-rows-container">
+          <tr class="batch-row" data-row="0">
+            <td style="padding:6px;position:relative;">
+              <input type="text" list="batch-datalist-0" class="batch-sewing-search" data-row="0" placeholder="🔍 Gõ tìm sản phẩm..." autocomplete="off" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid rgba(245,158,11,0.25);background:rgba(30,30,50,0.9);color:#e8d5b0;font-size:12px;" />
+              <datalist id="batch-datalist-0">${datalistOptionsHTML}</datalist>
+              <input type="hidden" class="batch-sewing-select" data-row="0" value="" />
+            </td>
+            ${ALL_SIZES.map(size => `<td style="padding:4px;text-align:center;"><input type="number" min="0" max="0" value="0" class="batch-size-input" data-row="0" data-size="${size}" disabled style="width:48px;text-align:center;padding:4px;border-radius:4px;border:1px solid rgba(255,255,255,0.05);background:rgba(255,255,255,0.02);color:#8a8a8a;font-size:12px;opacity:0.3"/></td>`).join('')}
+            <td style="padding:4px;text-align:center;"><button class="batch-remove-row" data-row="0" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:4px;">✕</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <button id="btn-add-batch-row" style="margin-top:10px;background:none;border:1px dashed rgba(255,255,255,0.2);color:var(--blue);cursor:pointer;padding:8px 16px;border-radius:6px;font-size:12px;width:100%;transition:all .2s;">+ Thêm dòng sản phẩm</button>
+  `,
+  `<button class="btn btn-secondary" onclick="document.getElementById('modal-overlay').classList.add('hidden')">Hủy</button>
+   <button class="btn btn-primary" id="btn-confirm-batch" style="background:linear-gradient(135deg,#f59e0b,#ef4444);border:none;">📦 Tạo Thẻ Giao Hàng</button>`);
+
+  let rowCount = 1;
+
+  const updateSizeInputs = (row, sewingId) => {
+    const sewSizes = sewingId ? store.getSewingSizes(sewingId) : [];
+    ALL_SIZES.forEach(size => {
+      const input = document.querySelector(`.batch-size-input[data-row="${row}"][data-size="${size}"]`);
+      if (!input) return;
+      const ss = sewSizes.find(sz => sz.size === size);
+      const max = ss ? Math.max(0, ss.quantitySent - ss.quantityReturned) : 0;
+      input.max = max; input.value = 0; input.disabled = max === 0;
+      input.style.opacity = max === 0 ? '0.3' : '1';
+      input.style.background = max === 0 ? 'rgba(255,255,255,0.02)' : 'var(--bg-primary)';
+      let maxLabel = input.parentElement.querySelector('.max-label');
+      if (max > 0) {
+        if (!maxLabel) { maxLabel = document.createElement('div'); maxLabel.className = 'max-label'; maxLabel.style.cssText = 'font-size:9px;color:var(--text-muted);margin-top:2px;'; input.parentElement.appendChild(maxLabel); }
+        maxLabel.textContent = `max ${max}`;
+      } else if (maxLabel) { maxLabel.remove(); }
+    });
+  };
+
+  const modalBody = document.getElementById('modal-body');
+  // Handle searchable input -> resolve to sewingId
+  modalBody.addEventListener('input', (e) => {
+    if (e.target.classList.contains('batch-sewing-search')) {
+      const row = e.target.dataset.row;
+      const val = e.target.value.trim();
+      const match = sewingOptions.find(o => o.id === val || o.label === val);
+      const hiddenInput = document.querySelector(`.batch-sewing-select[data-row="${row}"]`);
+      if (match) {
+        hiddenInput.value = match.id;
+        e.target.style.borderColor = 'rgba(34,197,94,0.5)';
+        e.target.style.color = '#a8d8a0';
+        updateSizeInputs(row, match.id);
+      } else {
+        hiddenInput.value = '';
+        e.target.style.borderColor = 'rgba(245,158,11,0.25)';
+        e.target.style.color = '#e8d5b0';
+        updateSizeInputs(row, '');
+      }
+    }
+  });
+  modalBody.addEventListener('click', (e) => {
+    if (e.target.classList.contains('batch-remove-row')) {
+      const row = e.target.closest('.batch-row');
+      if (row && document.querySelectorAll('.batch-row').length > 1) row.remove();
+    }
+  });
+
+  document.getElementById('btn-add-batch-row').addEventListener('click', () => {
+    const container = document.getElementById('batch-rows-container');
+    const tr = document.createElement('tr');
+    tr.className = 'batch-row'; tr.dataset.row = rowCount;
+    tr.innerHTML = `
+      <td style="padding:6px;position:relative;">
+        <input type="text" list="batch-datalist-${rowCount}" class="batch-sewing-search" data-row="${rowCount}" placeholder="🔍 Gõ tìm sản phẩm..." autocomplete="off" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid rgba(245,158,11,0.25);background:rgba(30,30,50,0.9);color:#e8d5b0;font-size:12px;" />
+        <datalist id="batch-datalist-${rowCount}">${datalistOptionsHTML}</datalist>
+        <input type="hidden" class="batch-sewing-select" data-row="${rowCount}" value="" />
+      </td>
+      ${ALL_SIZES.map(size => `<td style="padding:4px;text-align:center;"><input type="number" min="0" max="0" value="0" class="batch-size-input" data-row="${rowCount}" data-size="${size}" disabled style="width:48px;text-align:center;padding:4px;border-radius:4px;border:1px solid rgba(255,255,255,0.05);background:rgba(255,255,255,0.02);color:#8a8a8a;font-size:12px;opacity:0.3"/></td>`).join('')}
+      <td style="padding:4px;text-align:center;"><button class="batch-remove-row" data-row="${rowCount}" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:4px;">✕</button></td>`;
+    container.appendChild(tr);
+    rowCount++;
+  });
+
+  document.getElementById('btn-confirm-batch').addEventListener('click', () => {
+    const deliveryDate = document.getElementById('batch-delivery-date').value;
+    if (!deliveryDate) { showToast('Vui lòng chọn ngày giao hàng', 'error'); return; }
+
+    const rows = document.querySelectorAll('.batch-row');
+    let hasAny = false;
+    let errors = [];
+
+    rows.forEach(row => {
+      const sewingId = row.querySelector('.batch-sewing-select')?.value;
+      if (!sewingId) return;
+      const deliverySizes = [];
+      const sewingSizes = store.getSewingSizes(sewingId);
+
+      ALL_SIZES.forEach(size => {
+        const qty = parseInt(row.querySelector(`.batch-size-input[data-size="${size}"]`)?.value) || 0;
+        if (qty > 0) {
+          const ss = sewingSizes.find(s => s.size === size);
+          const max = ss ? Math.max(0, ss.quantitySent - ss.quantityReturned) : 0;
+          if (qty > max) { const lot = store.getLot(store.getSewing(sewingId)?.lotId); errors.push(`${lot?.fabricName || sewingId} size ${size}: max ${max}, nhập ${qty}`); }
+          deliverySizes.push({ size, quantity: qty });
+        }
+      });
+
+      if (deliverySizes.length > 0 && errors.length === 0) {
+        const updatedSewingSizes = sewingSizes.map(s => {
+          const del = deliverySizes.find(d => d.size === s.size);
+          return del ? { ...s, quantityReturned: s.quantityReturned + del.quantity } : s;
+        });
+        store.setSewingSizes(sewingId, updatedSewingSizes);
+        const allReturned = updatedSewingSizes.every(s => s.quantityReturned >= s.quantitySent);
+        store.updateSewing(sewingId, { status: allReturned ? 'Done' : 'Partial Return' });
+
+        const delivery = store.addDelivery({ sewingId, deliveryDate });
+        store.setDeliverySizes(delivery.id, deliverySizes);
+
+        const totalDelivered = deliverySizes.reduce((s, x) => s + x.quantity, 0);
+        const sewing = store.getSewing(sewingId);
+        if (sewing && totalDelivered > 0) store.consumeMaterialsForLot(sewing.lotId, totalDelivered);
+        hasAny = true;
+      }
+    });
+
+    if (errors.length > 0) { showToast(`Lỗi: ${errors[0]}`, 'error'); return; }
+    if (!hasAny) { showToast('Vui lòng chọn sản phẩm và nhập số lượng', 'error'); return; }
+
+    closeModal();
+    renderSewingTable();
+    showToast('Đã tạo thẻ giao hàng thành công! 🎉');
   });
 }
