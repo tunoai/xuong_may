@@ -76,7 +76,15 @@ export function initSewingModule() {
       return;
     }
 
-    // Edit Delivery Card
+    // Edit Grouped Delivery Card
+    const editGroupBtn = e.target.closest('.btn-edit-group-delivery');
+    if (editGroupBtn) {
+      e.stopPropagation();
+      showEditGroupedDeliveryModal(editGroupBtn.dataset.groupDate);
+      return;
+    }
+
+    // Edit Delivery Card (individual - from QC column)
     const editDelBtn = e.target.closest('.btn-edit-delivery');
     if (editDelBtn) {
       e.stopPropagation();
@@ -600,6 +608,110 @@ function showEditDeliveryModal(deliveryId) {
   });
 }
 
+function showEditGroupedDeliveryModal(groupDate) {
+  // Find all deliveries for this date
+  const allDeliveries = store.getDeliveries();
+  const groupDeliveries = allDeliveries.filter(d => {
+    const dk = d.deliveryDate || d.createdAt.split('T')[0];
+    return dk === groupDate && d.status === 'Delivery';
+  });
+
+  if (groupDeliveries.length === 0) { showToast('Không tìm thấy thẻ giao hàng', 'error'); return; }
+
+  // Build editable rows per delivery
+  const rowsData = groupDeliveries.map(d => {
+    const sewing = store.getSewing(d.sewingId);
+    const lot = sewing ? store.getLot(sewing.lotId) : null;
+    const sizes = store.getDeliverySizes(d.id);
+    const productName = lot ? (lot.fabricName || '') + (lot.color ? ' ' + lot.color : '') : d.sewingId;
+    const customerName = lot ? lot.customerName : '';
+    const sizeMap = {};
+    sizes.forEach(s => { sizeMap[s.size] = s.quantity; });
+    return { deliveryId: d.id, sewingId: d.sewingId, productName, customerName, sizeMap };
+  });
+
+  // Collect all sizes used
+  const allSizesUsed = new Set();
+  rowsData.forEach(r => Object.keys(r.sizeMap).forEach(s => allSizesUsed.add(s)));
+  const sizeOrder = ALL_SIZES.filter(s => allSizesUsed.has(s));
+  if (sizeOrder.length === 0) sizeOrder.push(...ALL_SIZES);
+
+  const headerCells = sizeOrder.map(s => `<th style="padding:6px 8px;font-size:12px;color:#b8a07a;font-weight:600;text-align:center;">${s}</th>`).join('');
+
+  const bodyRows = rowsData.map((r, idx) => {
+    const cells = sizeOrder.map(s => {
+      const qty = r.sizeMap[s] || 0;
+      return `<td style="padding:4px 6px;text-align:center;">
+        <input type="number" min="0" value="${qty}" 
+          class="group-edit-input" data-idx="${idx}" data-size="${s}"
+          style="width:52px;text-align:center;padding:4px;border-radius:4px;border:1px solid rgba(245,158,11,0.2);background:rgba(30,30,50,0.9);color:#e8d5b0;font-size:12px;" />
+      </td>`;
+    }).join('');
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05)">
+      <td style="padding:6px 8px;">
+        <div style="font-size:13px;font-weight:600;color:var(--orange)">${r.productName}</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${r.customerName}</div>
+      </td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  openModal(`✏️ Sửa Giao Hàng - ${formatDate(groupDate)}`, `
+    <div style="margin-bottom:16px;">
+      <label style="font-size:13px;color:var(--text-secondary);font-weight:600;display:block;margin-bottom:6px;">Ngày giao hàng</label>
+      <input type="date" id="group-edit-date" value="${groupDate}" required style="width:200px;padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:var(--bg-secondary);color:var(--text-primary);font-size:13px;" />
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
+          <th style="padding:6px 8px;font-size:12px;color:#b8a07a;font-weight:600;text-align:left;min-width:160px;">Lô vải / Sản phẩm</th>
+          ${headerCells}
+        </tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>
+  `,
+  `<button class="btn btn-secondary" onclick="document.getElementById('modal-overlay').classList.add('hidden')">Hủy</button>
+   <button class="btn btn-primary" id="btn-save-group-edit" style="background:var(--orange);border-color:var(--orange);">💾 Lưu Thay Đổi</button>`);
+
+  document.getElementById('btn-save-group-edit').addEventListener('click', () => {
+    const newDate = document.getElementById('group-edit-date').value;
+    if (!newDate) { showToast('Vui lòng chọn ngày', 'error'); return; }
+
+    rowsData.forEach((r, idx) => {
+      const sewingSizes = store.getSewingSizes(r.sewingId);
+      const oldDelSizes = store.getDeliverySizes(r.deliveryId);
+      const newDelSizes = [];
+
+      sizeOrder.forEach(size => {
+        const input = document.querySelector(`.group-edit-input[data-idx="${idx}"][data-size="${size}"]`);
+        const newQty = parseInt(input?.value) || 0;
+        const oldQty = oldDelSizes.find(s => s.size === size)?.quantity || 0;
+
+        // Update sewing quantityReturned
+        const ss = sewingSizes.find(s => s.size === size);
+        if (ss) {
+          ss.quantityReturned = Math.max(0, ss.quantityReturned - oldQty + newQty);
+        }
+        if (newQty > 0) newDelSizes.push({ size, quantity: newQty });
+      });
+
+      store.updateDelivery(r.deliveryId, { deliveryDate: newDate });
+      store.setDeliverySizes(r.deliveryId, newDelSizes);
+      store.setSewingSizes(r.sewingId, sewingSizes);
+
+      // Update sewing status
+      const updatedSewSizes = store.getSewingSizes(r.sewingId);
+      const allReturned = updatedSewSizes.every(s => s.quantityReturned >= s.quantitySent);
+      store.updateSewing(r.sewingId, { status: allReturned ? 'Done' : 'Partial Return' });
+    });
+
+    closeModal();
+    renderSewingTable();
+    showToast('Đã cập nhật thẻ giao hàng! ✅');
+  });
+}
+
 function showQCModal(deliveryId, editQcId = null) {
   const delivery = store.getDelivery(deliveryId);
   const sewing = store.getSewing(delivery.sewingId);
@@ -773,8 +885,9 @@ function renderGroupedDeliveries(deliveries) {
             </tbody>
           </table>
         </div>
-        <div style="display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap;">
-          ${group.map(d => `<button class="btn-icon btn-edit-delivery" data-delivery-id="${d.id}" title="Sửa" style="padding:2px 4px;font-size:11px;color:var(--text-muted)">✏️</button><button class="btn-icon btn-delete-delivery" data-delivery-id="${d.id}" title="Xóa" style="padding:2px 4px;font-size:11px;color:var(--red)">🗑️</button>`).join('')}
+        <div style="display:flex;gap:8px;justify-content:flex-end;align-items:center;">
+          <button class="btn-icon btn-edit-group-delivery" data-group-date="${dateKey}" title="Sửa tất cả" style="padding:3px 8px;font-size:11px;color:var(--orange);background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:3px;">✏️ Sửa</button>
+          ${group.map(d => `<button class="btn-icon btn-delete-delivery" data-delivery-id="${d.id}" title="Xóa ${rows.find(r=>r.deliveryId===d.id)?.productName||''}" style="padding:2px 4px;font-size:11px;color:var(--red)">🗑️</button>`).join('')}
         </div>
       </div>`;
   }).join('');
