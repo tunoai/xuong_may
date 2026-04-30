@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Xưởng May Bí Ngô - Quản Lý Sản Xuất</title>
+  <meta name="description" content="Hệ thống quản lý sản xuất xưởng may Bí Ngô - Theo dõi quy trình từ nhận vải đến hoàn tất" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="/xuong_may/logo.png" />
+  <link rel="shortcut icon" type="image/png" href="/xuong_may/logo.png" />
+
+  <!-- Apple Touch Icon (iPad / iPhone home screen) -->
+  <link rel="apple-touch-icon" href="/xuong_may/logo.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/xuong_may/logo.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="/xuong_may/logo.png" />
+  <link rel="apple-touch-icon" sizes="167x167" href="/xuong_may/logo.png" />
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/xuong_may/manifest.json" />
+
+  <!-- iOS PWA settings -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Bí Ngô" />
+  <meta name="theme-color" content="#e88c30" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="app">
+    <!-- Top Bar -->
+    <header id="topbar">
+      <div class="topbar-left">
+        <span class="topbar-brand">QUẢN LÝ SẢN XUẤT</span>
+        <div class="topbar-search">
+          <span class="topbar-search-icon">🔍</span>
+          <input type="text" placeholder="Tìm kiếm lô hàng, mã SKU..." />
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button class="topbar-icon" title="Thông báo">🔔</button>
+        <button class="topbar-icon" title="Cài đặt">⚙️</button>
+        <button class="topbar-icon" title="Trợ giúp">❓</button>
+        <div class="topbar-user">
+          <div class="topbar-avatar">QT</div>
+        </div>
+      </div>
+    </header>
+
+    <aside id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <img src="./public/logo.png" alt="Logo" class="logo-img" />
+          <span class="logo-text">XƯỞNG MAY<br/>BÍ NGÔ</span>
+        </div>
+      </div>
+      <nav id="main-nav">
+        <a href="#" class="nav-item active" data-module="dashboard">
+          <span class="nav-icon">📊</span>
+          <span>Bảng Điều Khiển</span>
+        </a>
+        <a href="#" class="nav-item" data-module="fabric">
+          <span class="nav-icon">🧶</span>
+          <span>Kho Vải & Cắt</span>
+        </a>
+        <a href="#" class="nav-item" data-module="sewing">
+          <span class="nav-icon">🪡</span>
+          <span>Tiến Độ May & QC</span>
+        </a>
+        <a href="#" class="nav-item" data-module="history">
+          <span class="nav-icon">📦</span>
+          <span>Lịch Sử Giao Hàng</span>
+        </a>
+        <a href="#" class="nav-item" data-module="rework">
+          <span class="nav-icon">⚠️</span>
+          <span>Hàng Lỗi</span>
+        </a>
+        <div class="nav-divider"></div>
+        <a href="#" class="nav-item" data-module="techpack">
+          <span class="nav-icon">📐</span>
+          <span>Mẫu & Định Mức</span>
+        </a>
+        <a href="#" class="nav-item" data-module="material">
+          <span class="nav-icon">📦</span>
+          <span>Kho Phụ Liệu</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="btn-export-data" class="btn-export" title="Xuất dữ liệu">💾 Export</button>
+        <button id="btn-import-data" class="btn-import" title="Nhập dữ liệu">📂 Import</button>
+        <input type="file" id="import-file-input" accept=".json" style="display:none" />
+      </div>
+    </aside>
+
+    <main id="main-content">
+      <!-- Dashboard Module -->
+      <section id="module-dashboard" class="module active">
+        <div class="module-header">
+          <div>
+            <h1>📊 Bảng Điều Khiển</h1>
+            <p class="module-subtitle">Tổng quan sản xuất - Theo dõi thời gian thực</p>
+          </div>
+        </div>
+        <div id="dashboard-filter-bar"></div>
+        <div id="dashboard-content"></div>
+      </section>
+
+      <!-- Techpack Module -->
+      <section id="module-techpack" class="module">
+        <div class="module-header">
+          <div>
+            <h1>📐 Tiêu Chuẩn & Định Mức</h1>
+            <p class="module-subtitle">Khai báo hình ảnh mẫu, quy cách may và định mức nguyên phụ liệu cho từng lô</p>
+          </div>
+          <button id="btn-add-techpack" class="btn btn-primary">➕ Thêm Mẫu Mới</button>
+        </div>
+        
+        <div class="techpack-toolbar" style="margin-bottom:15px; display:flex;">
+          <div class="topbar-search" style="margin:0; flex:1; max-width:400px; background:var(--bg-body); border-color:var(--border-light);">
+            <span class="topbar-search-icon">🔍</span>
+            <input type="text" id="techpack-search" placeholder="Tìm theo tên mẫu/sản phẩm..." />
+          </div>
+        </div>
+
+        <div id="techpack-list" class="techpack-grid"></div>
+      </section>
+
+      <!-- Material Module -->
+      <section id="module-material" class="module">
+        <div class="module-header">
+          <div>
+            <h1>📦 Kho Phụ Liệu</h1>
+            <p class="module-subtitle">Quản lý nhập/xuất và theo dõi tồn kho nguyên phụ liệu</p>
+          </div>
+          <button id="btn-add-material" class="btn btn-primary">➕ Nhập Phụ Liệu Mới</button>
+        </div>
+        <div class="techpack-toolbar" style="margin-bottom:15px; display:flex;">
+          <div class="topbar-search" style="margin:0; flex:1; max-width:400px; background:var(--bg-body); border-color:var(--border-light);">
+            <span class="topbar-search-icon">🔍</span>
+            <input type="text" id="material-search" placeholder="Tìm tên hoặc mã phụ liệu..." />
+          </div>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Mã PL</th>
+                <th>Tên Phụ Liệu</th>
+                <th>Tồn Kho</th>
+                <th>Đơn Vị</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="material-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Fabric & Cutting Kanban Module -->
+      <section id="module-fabric" class="module">
+        <div class="module-header">
+          <div>
+            <h1>🧶 Quản Lý Kho Vải & Cắt</h1>
+            <p class="module-subtitle">Kéo thả lô vải để chuyển qua công đoạn cắt</p>
+          </div>
+          <button class="btn btn-primary" id="btn-add-lot">+ Tạo Lô Vải Mới</button>
+        </div>
+        <div class="filters-bar" id="fabric-filters" style="margin-bottom:20px; display:flex; align-items:center; gap:20px; background:var(--bg-card); padding:16px 20px; border-radius:var(--radius); border:1px solid var(--border); box-shadow:var(--shadow-sm);">
+          <div class="topbar-search" style="margin:0; flex:1; max-width:400px; background:var(--bg-body); border-color:var(--border-light);">
+            <span class="topbar-search-icon">🔍</span>
+            <input type="text" id="fabric-search-input" placeholder="Tìm mã lô, khách hàng, tên vải..." />
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <label style="font-size:12px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Trạng thái:</label>
+            <select id="fabric-status-filter" style="padding:8px 14px; background:var(--bg-body); border:1px solid var(--border-light); border-radius:var(--radius-sm); color:var(--text-primary); font-family:var(--font); font-size:13px; outline:none; cursor:pointer; transition:var(--transition);">
+              <option value="all">🌟 Tất cả</option>
+              <option value="new">📦 Chưa cắt (Lô vải mới)</option>
+              <option value="cutting">✂️ Đang cắt</option>
+            </select>
+          </div>
+        </div>
+        <div id="fabric-kanban-container" class="kanban-board">
+          <!-- Rendered via JS -->
+        </div>
+      </section>
+
+      <!-- Sewing Kanban Module -->
+      <section id="module-sewing" class="module">
+        <div class="module-header">
+          <div>
+            <h1>🪡 Tiến Độ May & QC</h1>
+            <p class="module-subtitle">Kéo thả thẻ để Giao hàng và chuyển sang QC</p>
+          </div>
+          <div style="display:flex;gap:8px" id="sewing-kanban-controls">
+            <!-- Rendered via JS -->
+          </div>
+        </div>
+        <div class="filters-bar" id="sewing-filters" style="margin-bottom:16px;"></div>
+        <div id="sewing-kanban-container" class="kanban-board">
+          <!-- Rendered via JS -->
+        </div>
+      </section>
+
+      <!-- History Module -->
+      <section id="module-history" class="module">
+        <div class="module-header">
+          <div>
+            <h1>📦 Lịch Sử Giao Hàng</h1>
+            <p class="module-subtitle">Danh sách các lô hàng đã được duyệt và bàn giao</p>
+          </div>
+        </div>
+        <div class="filters-bar" id="history-filters" style="margin-bottom:16px;"></div>
+        <div id="history-container">
+          <!-- Rendered via JS -->
+        </div>
+      </section>
+
+      <!-- Rework Module -->
+      <section id="module-rework" class="module">
+        <div class="module-header">
+          <div>
+            <h1>⚠️ Xử Lý Hàng Lỗi</h1>
+            <p class="module-subtitle">Kéo thả thẻ để cập nhật trạng thái sửa lỗi</p>
+          </div>
+        </div>
+        <div id="rework-kanban-container" class="kanban-board">
+          <!-- Rendered via JS -->
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div id="modal" class="modal">
+      <div class="modal-header">
+        <h2 id="modal-title"></h2>
+        <button class="modal-close" id="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer" id="modal-footer"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast-container"></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
