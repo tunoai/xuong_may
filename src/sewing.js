@@ -127,6 +127,23 @@ export function initSewingModule() {
       return;
     }
 
+    // Delete QC
+    const delQcBtn = e.target.closest('.btn-delete-qc');
+    if (delQcBtn) {
+      e.stopPropagation();
+      const qcId = delQcBtn.dataset.qcId;
+      if (confirm('Bạn có chắc muốn xóa phiếu QC này?')) {
+        const qc = store.getQC(qcId);
+        if (qc && qc.deliveryId) {
+          store.updateDelivery(qc.deliveryId, { status: 'QC' });
+        }
+        store.deleteQC(qcId);
+        renderSewingTable();
+        showToast('Đã xóa phiếu QC', 'info');
+      }
+      return;
+    }
+
     // Complete Pass (Hoàn thành)
     const completeBtn = e.target.closest('.btn-qc-complete');
     if (completeBtn) {
@@ -363,6 +380,7 @@ export function renderSewingTable() {
           <div style="display:flex; gap:6px; align-items:center;">
             <span style="font-size:11px; color:var(--text-muted)">${qc.id}</span>
             <button class="btn-icon btn-edit-qc" data-qc-id="${qc.id}" title="Sửa QC" style="padding:0; font-size:12px;">✏️</button>
+            <button class="btn-icon btn-delete-qc" data-qc-id="${qc.id}" title="Xóa QC" style="padding:0; font-size:12px; color:var(--red);">🗑️</button>
           </div>
         </div>
         <div style="font-size:12px; color:var(--text-primary); margin-bottom: 8px;">
