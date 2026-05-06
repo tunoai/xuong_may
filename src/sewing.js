@@ -165,6 +165,14 @@ export function initSewingModule() {
       showToast('Đã chuyển sang tab HÀNG LỖI', 'warning');
       return;
     }
+    
+    // Export Excel
+    const exportSewingBtn = e.target.closest('.btn-export-sewing');
+    if (exportSewingBtn) {
+      e.stopPropagation();
+      exportActiveSewingsToExcel();
+      return;
+    }
   });
 
   window.handleSewingDragStart = (e) => {
@@ -216,6 +224,101 @@ export function initSewingModule() {
   });
 
   renderSewingTable();
+}
+
+function exportActiveSewingsToExcel() {
+  const allSewings = store.getSewings();
+  const searchQuery = document.getElementById('sewing-search')?.value.toLowerCase() || '';
+  const filterLotId = document.getElementById('filter-sewing-lot')?.value.toLowerCase() || '';
+  const filterWorkshop = document.getElementById('filter-sewing-workshop')?.value.toLowerCase() || '';
+
+  const filterItem = (s) => {
+    if (filterLotId) {
+      const lot = store.getLot(s.lotId);
+      const lotStr = `${s.lotId} ${lot?.fabricName || ''} ${lot?.customerName || ''}`.toLowerCase();
+      if (!lotStr.includes(filterLotId)) return false;
+    }
+    if (filterWorkshop && !(s.workshopName || '').toLowerCase().includes(filterWorkshop)) return false;
+    
+    if (!searchQuery) return true;
+    const lot = store.getLot(s.lotId);
+    const textToSearch = `${s.id} ${s.lotId} ${lot?.customerName || ''} ${lot?.fabricName || ''} ${s.workshopName || ''}`.toLowerCase();
+    return textToSearch.includes(searchQuery);
+  };
+
+  const activeSewings = allSewings.filter(s => s.status !== 'Done' && filterItem(s));
+
+  if (activeSewings.length === 0) {
+    showToast('Không có dữ liệu để xuất', 'info');
+    return;
+  }
+
+  const allSizesSet = new Set();
+  activeSewings.forEach(sewing => {
+    const sizes = store.getSewingSizes(sewing.id);
+    sizes.forEach(s => {
+      if ((s.quantitySent - s.quantityReturned) > 0) {
+        allSizesSet.add(s.size);
+      }
+    });
+  });
+  
+  const sortedSizes = Array.from(allSizesSet).sort((a, b) => {
+    const idxA = SIZES.indexOf(a);
+    const idxB = SIZES.indexOf(b);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return a.localeCompare(b);
+  });
+
+  let csvContent = '\uFEFF';
+  const headers = ["Ngày Nhận", "Mã Cắt", "Lô Vải", "Tên Vải", "Mét Vải", "Khách Hàng", "Xưởng May", ...sortedSizes, "Tổng SL Đang Giữ"];
+  csvContent += headers.join(',') + "\n";
+
+  activeSewings.forEach(sewing => {
+    const lot = store.getLot(sewing.lotId) || {};
+    const sizes = store.getSewingSizes(sewing.id);
+    
+    let totalQty = 0;
+    const sizeColumns = sortedSizes.map(sz => {
+      const s = sizes.find(x => x.size === sz);
+      if (s) {
+        const inProg = s.quantitySent - s.quantityReturned;
+        totalQty += inProg;
+        return inProg;
+      }
+      return 0;
+    });
+
+    if (totalQty > 0) {
+      const receiveDate = formatDate(sewing.createdAt?.split('T')[0]) || '';
+      const row = [
+        `"${receiveDate}"`,
+        `"${sewing.id}"`,
+        `"${sewing.lotId}"`,
+        `"${lot.fabricName || ''}"`,
+        `"${lot.totalFabric || ''}"`,
+        `"${lot.customerName || ''}"`,
+        `"${sewing.workshopName || ''}"`,
+        ...sizeColumns,
+        totalQty
+      ];
+      csvContent += row.join(',') + "\n";
+    }
+  });
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const fileNameDate = new Date().toLocaleDateString('vi-VN').replace(/\//g, '-');
+  a.download = `Dang_May_${fileNameDate}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Đã xuất dữ liệu Excel!', 'success');
 }
 
 export function renderSewingTable() {
@@ -398,8 +501,11 @@ export function renderSewingTable() {
 
   container.innerHTML = `
     <div class="kanban-col" id="col-sewing-received">
-      <div class="kanban-col-header" style="border-bottom-color:var(--blue)">
-        NHẬN VẢI CẮT - ĐANG MAY <span class="badge" style="background:var(--blue)">${activeSewings.length}</span>
+      <div class="kanban-col-header" style="border-bottom-color:var(--blue); display:flex; justify-content:space-between; align-items:center;">
+        <div>NHẬN VẢI CẮT - ĐANG MAY <span class="badge" style="background:var(--blue)">${activeSewings.length}</span></div>
+        <button class="btn btn-xs btn-export-sewing" style="background:var(--bg-card); border:1px solid var(--border-light); color:var(--text-primary); padding:3px 8px; font-size:11px; display:flex; align-items:center; gap:4px; border-radius:4px; cursor:pointer;" title="Xuất danh sách đang may ra Excel">
+          <span>📥</span> Excel
+        </button>
       </div>
       <div class="kanban-cards">
         ${activeSewings.map(s => renderSewingCard(s)).join('')}
