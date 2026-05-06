@@ -273,7 +273,7 @@ function exportActiveSewingsToExcel() {
   });
 
   let csvContent = '\uFEFF';
-  const headers = ["Ngày Nhận", "Mã Cắt", "Lô Vải", "Tên Vải", "Mét Vải", "Khách Hàng", "Xưởng May", ...sortedSizes, "Tổng SL Đang Giữ"];
+  const headers = ["Ngày Nhận", "Mã Cắt", "Lô Vải", "Tên Vải", "Khách Hàng", "Xưởng May", ...sortedSizes, "Tổng SL Đang Giữ"];
   csvContent += headers.join(',') + "\n";
 
   activeSewings.forEach(sewing => {
@@ -293,12 +293,15 @@ function exportActiveSewingsToExcel() {
 
     if (totalQty > 0) {
       const receiveDate = formatDate(sewing.createdAt?.split('T')[0]) || '';
+      let tenVaiStr = sewing.lotId;
+      if (lot && lot.fabricName) {
+         tenVaiStr = `Lô: ${lot.fabricName}${lot.totalFabric ? ' ' + lot.totalFabric + 'm' : ''}`;
+      }
       const row = [
         `"${receiveDate}"`,
         `"${sewing.id}"`,
         `"${sewing.lotId}"`,
-        `"${lot.fabricName || ''}"`,
-        `"${lot.totalFabric || ''}"`,
+        `"${tenVaiStr}"`,
         `"${lot.customerName || ''}"`,
         `"${sewing.workshopName || ''}"`,
         ...sizeColumns,
