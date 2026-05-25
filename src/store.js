@@ -97,6 +97,33 @@ class Store {
   getLots() { return this.data.lots; }
 
   deleteLot(id) {
+    // Cascade delete all related data
+    const sewingIds = this.data.sewings.filter(s => s.lotId === id).map(s => s.id);
+    const deliveryIds = (this.data.deliveries || []).filter(d => sewingIds.includes(d.sewingId)).map(d => d.id);
+    const qcIds = this.data.qcRecords.filter(q => sewingIds.includes(q.sewingId)).map(q => q.id);
+
+    // Delete QC results & reworks
+    this.data.qcResults = this.data.qcResults.filter(r => !qcIds.includes(r.qcId));
+    this.data.reworks = this.data.reworks.filter(r => !qcIds.includes(r.qcId));
+    // Delete QC records
+    this.data.qcRecords = this.data.qcRecords.filter(q => !qcIds.includes(q.id));
+    // Delete delivery sizes & deliveries
+    if (this.data.deliverySizes) {
+      this.data.deliverySizes = this.data.deliverySizes.filter(s => !deliveryIds.includes(s.deliveryId));
+    }
+    if (this.data.deliveries) {
+      this.data.deliveries = this.data.deliveries.filter(d => !deliveryIds.includes(d.id));
+    }
+    // Delete sewing sizes & sewings
+    this.data.sewingSizes = this.data.sewingSizes.filter(s => !sewingIds.includes(s.sewingId));
+    this.data.sewings = this.data.sewings.filter(s => s.lotId !== id);
+    // Delete cutting sizes & cuttings
+    const cuttingIds = this.data.cuttings.filter(c => c.lotId === id).map(c => c.id);
+    this.data.cuttingSizes = this.data.cuttingSizes.filter(s => !cuttingIds.includes(s.cuttingId));
+    this.data.cuttings = this.data.cuttings.filter(c => c.lotId !== id);
+    // Delete priority sizes
+    if (this.data.prioritySizes) delete this.data.prioritySizes[id];
+    // Delete lot
     this.data.lots = this.data.lots.filter(l => l.id !== id);
     this.save();
   }
