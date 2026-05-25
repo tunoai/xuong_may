@@ -68,7 +68,7 @@ export function renderDashboard() {
   const alerts = [];
   lots.filter(l => l.priority === 'Urgent' || l.priority === 'Very Urgent').forEach(l => {
     const lotName = `${(l.fabricName || '').toUpperCase()}${l.color ? ' ' + l.color.toUpperCase() : ''} - ${l.customerName || ''}`;
-    alerts.push({ type: 'urgent', icon: '⚠️', text: `${lotName}: ${l.priority}` });
+    alerts.push({ type: 'urgent', icon: '⚠️', text: `${lotName}: ${l.priority}`, lotId: l.id });
   });
 
   const sewingAlerts = [];
@@ -85,7 +85,8 @@ export function renderDashboard() {
         type: isAlmostDone ? 'urgent' : 'info', 
         icon: isAlmostDone ? '⏳' : '🪡', 
         text: `${lotName} (${s.workshopName}): ${inProg} pcs đang may [${detail}]${isAlmostDone ? ' - SẮP HẾT' : ''}`,
-        inProg: inProg 
+        inProg: inProg,
+        lotId: s.lotId
       });
     }
   });
@@ -161,7 +162,7 @@ export function renderDashboard() {
       </div>`;
     }).join('');
 
-    return `<div class="dash-lot-card${hasPrio ? ' dash-prio' : ''}">
+    return `<div class="dash-lot-card${hasPrio ? ' dash-prio' : ''}" data-lot-id="${lot.id}">
       <div class="dash-lot-header">
         <div class="dash-lot-id">
           <span class="dash-lot-code">${lot.id}</span>
@@ -402,7 +403,7 @@ export function renderDashboard() {
     <!-- Alerts -->
     ${alerts.length > 0 ? `<div class="dashboard-section">
       <h3>🚨 Cảnh Báo (${alerts.length})</h3>
-      <ul class="alert-list">${alerts.map(a => `<li class="alert-item ${a.type}">${a.icon} ${a.text}</li>`).join('')}</ul>
+      <ul class="alert-list">${alerts.map(a => `<li class="alert-item ${a.type}${a.lotId ? ' alert-clickable' : ''}" ${a.lotId ? `data-lot-id="${a.lotId}"` : ''} title="${a.lotId ? 'Bấm để xem chi tiết lô' : ''}">${a.icon} ${a.text}</li>`).join('')}</ul>
     </div>` : ''}
 
     <!-- Workshop Summary -->
@@ -439,6 +440,19 @@ export function renderDashboard() {
       </div>
     </div>
   `;
+
+  // === Alert click -> scroll to lot card ===
+  container.querySelectorAll('.alert-item[data-lot-id]').forEach(el => {
+    el.addEventListener('click', () => {
+      const lotId = el.dataset.lotId;
+      const lotCard = container.querySelector(`.dash-lot-card[data-lot-id="${lotId}"]`);
+      if (lotCard) {
+        lotCard.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        lotCard.classList.add('dash-lot-highlight');
+        setTimeout(() => lotCard.classList.remove('dash-lot-highlight'), 2000);
+      }
+    });
+  });
 }
 
 function renderFilterBar(filterBarEl, allWorkshops) {

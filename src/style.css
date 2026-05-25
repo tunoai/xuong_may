@@ -616,6 +616,25 @@ tbody tr:last-child td { border-bottom: none; }
 .alert-item.danger { background: var(--red-bg); border-left-color: var(--red); color: var(--red); }
 .alert-item.info { background: var(--blue-bg); border-left-color: var(--blue); color: var(--blue); }
 
+.alert-item.alert-clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.alert-item.alert-clickable:hover {
+  transform: translateX(4px);
+  filter: brightness(1.2);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.dash-lot-highlight {
+  animation: lotHighlight 2s ease;
+}
+@keyframes lotHighlight {
+  0% { box-shadow: 0 0 0 3px rgba(59,130,246,0.7), 0 0 20px rgba(59,130,246,0.4); transform: scale(1.02); }
+  50% { box-shadow: 0 0 0 3px rgba(59,130,246,0.5), 0 0 15px rgba(59,130,246,0.3); transform: scale(1.01); }
+  100% { box-shadow: none; transform: scale(1); }
+}
+
 .chart-container {
   position: relative;
   height: 280px;
