@@ -856,6 +856,33 @@ tbody tr:last-child td { border-bottom: none; }
   opacity: 0.8;
 }
 
+/* Completed lot card */
+.dash-lot-card.dash-completed {
+  border-color: rgba(34,197,94,0.4);
+}
+.dash-lot-card.dash-completed::before {
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  opacity: 0.9;
+}
+.dash-completed-banner {
+  text-align: center;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, rgba(34,197,94,0.2), rgba(16,163,74,0.15));
+  border: 1px solid rgba(34,197,94,0.4);
+  border-radius: 8px;
+  color: #4ade80;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  animation: completedPulse 2s ease-in-out infinite;
+}
+@keyframes completedPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(34,197,94,0.2); }
+  50% { box-shadow: 0 0 16px rgba(34,197,94,0.4); }
+}
+
 /* Lot Card Header */
 .dash-lot-header {
   display: flex;

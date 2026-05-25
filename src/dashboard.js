@@ -126,6 +126,7 @@ export function renderDashboard() {
     const progress = summary.totalCut > 0 ? Math.round((summary.totalPassed / summary.totalCut) * 100) : 0;
     const remaining = summary.totalCut - summary.totalPassed - summary.totalFailed;
     const inSewing = summary.totalSent - summary.totalReturned;
+    const isCompleted = summary.totalCut > 0 && remaining <= 0 && summary.totalFailed === 0;
 
     // Find workshops holding this lot
     const lotSewings = store.getSewingsByLot(lot.id);
@@ -161,7 +162,7 @@ export function renderDashboard() {
       </div>`;
     }).join('');
 
-    return `<div class="dash-lot-card${hasPrio ? ' dash-prio' : ''}" data-lot-id="${lot.id}">
+    return `<div class="dash-lot-card${hasPrio ? ' dash-prio' : ''}${isCompleted ? ' dash-completed' : ''}" data-lot-id="${lot.id}">
       <div class="dash-lot-header">
         <div class="dash-lot-id">
           <span class="dash-lot-code">${lot.id}</span>
@@ -195,6 +196,8 @@ export function renderDashboard() {
           <div class="dash-progress-fill" style="width:${progress}%"></div>
         </div>
       </div>
+
+      ${isCompleted ? `<div class="dash-completed-banner">✅ ĐÃ GIAO HẾT</div>` : ''}
 
       <div class="dash-stats-row">
         <div class="dash-stat-mini blue">
