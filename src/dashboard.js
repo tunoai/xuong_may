@@ -70,15 +70,25 @@ export function renderDashboard() {
     alerts.push({ type: 'urgent', icon: '⚠️', text: `${l.id} - ${l.customerName}: ${l.priority}` });
   });
 
-  store.getSewings().filter(s => s.status === 'In Progress').forEach(s => {
+  const sewingAlerts = [];
+  store.getSewings().filter(s => s.status !== 'Done').forEach(s => {
     const sizes = store.getSewingSizes(s.id);
     const inProg = sizes.reduce((sum, sz) => sum + sz.quantitySent - sz.quantityReturned, 0);
     if (inProg > 0) {
       const detail = sizes.filter(sz => sz.quantitySent - sz.quantityReturned > 0)
         .map(sz => `${sz.size}:${sz.quantitySent - sz.quantityReturned}`).join(', ');
-      alerts.push({ type: 'info', icon: '🪡', text: `${s.id} (${s.workshopName}): ${inProg} pcs đang may [${detail}]` });
+      const isAlmostDone = inProg < 10;
+      sewingAlerts.push({ 
+        type: isAlmostDone ? 'urgent' : 'info', 
+        icon: isAlmostDone ? '⏳' : '🪡', 
+        text: `${s.id} (${s.workshopName}): ${inProg} pcs đang may [${detail}]${isAlmostDone ? ' - Sắp xong' : ''}`,
+        inProg: inProg 
+      });
     }
   });
+
+  sewingAlerts.sort((a, b) => a.inProg - b.inProg);
+  alerts.push(...sewingAlerts);
 
   const unresolvedReworks = store.getReworks().filter(r => r.status !== 'Returned' && r.status !== 'Rechecked OK');
   if (unresolvedReworks.length > 0) {
@@ -118,10 +128,27 @@ export function renderDashboard() {
     const lotSewings = store.getSewingsByLot(lot.id);
     const workshopNames = [...new Set(lotSewings.map(s => s.workshopName).filter(Boolean))];
 
-    const sizeChips = sizeBreak.map(s => {
+    // Sort sizes: remaining > 0 first (ascending by remaining), then remaining = 0
+    const sortedSizeBreak = [...sizeBreak].sort((a, b) => {
+      const remA = a.cut - a.passed - a.failed;
+      const remB = b.cut - b.passed - b.failed;
+      if (remA > 0 && remB <= 0) return -1;
+      if (remA <= 0 && remB > 0) return 1;
+      if (remA > 0 && remB > 0) return remA - remB;
+      return 0;
+    });
+
+    const sizeChips = sortedSizeBreak.map(s => {
       const isPrio = prioSizes.includes(s.size);
-      return `<div class="dash-size-chip${isPrio ? ' prio' : ''}">
-        <span class="dash-size-label">${isPrio ? '⭐ ' : ''}${s.size}</span>
+      const sizeRemaining = s.cut - s.passed - s.failed;
+      const isLow = sizeRemaining > 0 && sizeRemaining < 10;
+      const isDone = sizeRemaining <= 0;
+      const remainClass = isDone ? 'sz-done' : isLow ? 'sz-low' : 'sz-remaining';
+      return `<div class="dash-size-chip${isPrio ? ' prio' : ''}${isLow ? ' low-remaining' : ''}${isDone ? ' done' : ''}">
+        <div class="dash-size-top">
+          <span class="dash-size-label">${isPrio ? '⭐ ' : ''}${s.size}</span>
+          <span class="dash-size-remain ${remainClass}" title="Còn lại">${isDone ? '✓' : sizeRemaining}</span>
+        </div>
         <div class="dash-size-nums">
           <span class="sz-cut" title="Cắt">C:${s.cut}</span>
           <span class="sz-sew" title="Đang may">${s.inProgress > 0 ? `M:${s.inProgress}` : ''}</span>
@@ -196,7 +223,7 @@ export function renderDashboard() {
       </div>` : ''}
 
       <div class="dash-sizes-section">
-        <div class="dash-sizes-title">Chi tiết size</div>
+        <div class="dash-sizes-title">Số size còn lại</div>
         <div class="dash-sizes-grid">${sizeChips}</div>
       </div>
     </div>`;
