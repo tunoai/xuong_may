@@ -421,33 +421,20 @@ export function renderDashboard() {
         </tr>`;
       }).join('');
 
-      const popupOverlay = document.createElement('div');
-      popupOverlay.className = 'lot-detail-overlay';
-      popupOverlay.innerHTML = `
-        <div class="lot-detail-popup" style="max-width:450px;">
-          <div class="lot-detail-popup-header">
-            <h3 style="margin:0;font-size:16px;">🏭 ${wsName}</h3>
-            <button class="lot-detail-close">&times;</button>
-          </div>
-          <div class="lot-detail-popup-body" style="padding:16px;">
-            <table style="width:100%;border-collapse:collapse;font-size:13px;">
-              <thead>
-                <tr style="border-bottom:2px solid rgba(255,255,255,0.1);">
-                  <th style="text-align:left;padding:8px;color:var(--text-muted);font-size:11px;">LÔ VẢI</th>
-                  <th style="text-align:center;padding:8px;color:var(--green);font-size:11px;">ĐÃ GIAO</th>
-                  <th style="text-align:center;padding:8px;color:#facc15;font-size:11px;">CÒN LẠI</th>
-                </tr>
-              </thead>
-              <tbody>${lotRows || '<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-muted)">Không có lô nào</td></tr>'}</tbody>
-            </table>
-          </div>
-        </div>`;
-      document.body.appendChild(popupOverlay);
-      requestAnimationFrame(() => popupOverlay.classList.add('active'));
-      popupOverlay.querySelectorAll('.lot-detail-close').forEach(btn => {
-        btn.addEventListener('click', () => { popupOverlay.classList.remove('active'); setTimeout(() => popupOverlay.remove(), 200); });
-      });
-      popupOverlay.addEventListener('click', (e) => { if (e.target === popupOverlay) { popupOverlay.classList.remove('active'); setTimeout(() => popupOverlay.remove(), 200); } });
+      const body = `
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="border-bottom:2px solid rgba(255,255,255,0.1);">
+              <th style="text-align:left;padding:8px;color:var(--text-muted);font-size:11px;">LÔ VẢI</th>
+              <th style="text-align:center;padding:8px;color:var(--green);font-size:11px;">ĐÃ GIAO</th>
+              <th style="text-align:center;padding:8px;color:#facc15;font-size:11px;">CÒN LẠI</th>
+            </tr>
+          </thead>
+          <tbody>${lotRows || '<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-muted)">Không có lô nào</td></tr>'}</tbody>
+        </table>`;
+
+      openModal(`🏭 ${wsName}`, body,
+        `<button class="btn btn-secondary" onclick="document.getElementById('modal-overlay').classList.add('hidden')">Đóng</button>`);
     });
   });
 
