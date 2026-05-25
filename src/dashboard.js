@@ -255,89 +255,89 @@ export function renderDashboard() {
     </div>`;
   }).join('');
 
-  // === Build Workshop Summary Cards ===
-  const workshopCards = allWorkshops.map(workshopName => {
+  // === Build Workshop Summary Table ===
+  const workshopTableData = allWorkshops.map(workshopName => {
     const workshopSewings = store.getSewings().filter(s => s.workshopName === workshopName);
     
-    // Apply filter
     if (dashboardFilters.workshopSearch) {
       const q = dashboardFilters.workshopSearch.toLowerCase();
-      if (!workshopName.toLowerCase().includes(q)) return '';
+      if (!workshopName.toLowerCase().includes(q)) return null;
     }
 
-    let totalHolding = 0;
-    let totalDefects = 0;
+    let totalSent = 0, totalReturned = 0, todayReturned = 0;
     const lotMap = {};
+    const todayStr = new Date().toISOString().split('T')[0];
 
     workshopSewings.forEach(sewing => {
       const lot = store.getLot(sewing.lotId);
       const sizes = store.getSewingSizes(sewing.id);
-      const inProgress = sizes.reduce((sum, sz) => sum + Math.max(0, sz.quantitySent - sz.quantityReturned), 0);
-      totalHolding += inProgress;
+      const sent = sizes.reduce((sum, sz) => sum + sz.quantitySent, 0);
+      const returned = sizes.reduce((sum, sz) => sum + sz.quantityReturned, 0);
+      totalSent += sent;
+      totalReturned += returned;
 
-      // Get defects for this sewing
-      const qcRecords = store.getQCsBySewing(sewing.id);
-      const defects = qcRecords.reduce((sum, qc) => {
-        const results = store.getQCResults(qc.id);
-        return sum + results.reduce((s, r) => s + r.failed, 0);
-      }, 0);
-      totalDefects += defects;
+      // Today's deliveries for this sewing
+      const deliveries = store.getDeliveries().filter(d => d.sewingId === sewing.id && d.createdAt && d.createdAt.startsWith(todayStr));
+      deliveries.forEach(d => {
+        const dSizes = store.getDeliverySizes(d.id);
+        todayReturned += dSizes.reduce((sum, sz) => sum + sz.quantity, 0);
+      });
 
       const lotKey = sewing.lotId;
       if (!lotMap[lotKey]) {
-        lotMap[lotKey] = {
-          lot,
-          totalSent: 0,
-          totalReturned: 0,
-          inProgress: 0,
-          defects: 0
-        };
+        lotMap[lotKey] = { lot, totalSent: 0, totalReturned: 0, inProgress: 0 };
       }
-      lotMap[lotKey].totalSent += sizes.reduce((sum, sz) => sum + sz.quantitySent, 0);
-      lotMap[lotKey].totalReturned += sizes.reduce((sum, sz) => sum + sz.quantityReturned, 0);
-      lotMap[lotKey].inProgress += inProgress;
-      lotMap[lotKey].defects += defects;
+      lotMap[lotKey].totalSent += sent;
+      lotMap[lotKey].totalReturned += returned;
+      lotMap[lotKey].inProgress += Math.max(0, sent - returned);
     });
 
-    const lotEntries = Object.values(lotMap).filter(e => {
-      if (dashboardFilters.lotSearch) {
-        const q = dashboardFilters.lotSearch.toLowerCase();
-        const searchStr = `${e.lot?.id || ''} ${e.lot?.fabricName || ''} ${e.lot?.customerName || ''}`.toLowerCase();
-        if (!searchStr.includes(q)) return false;
-      }
-      return true;
-    });
+    const activeLots = Object.values(lotMap).filter(e => e.inProgress > 0);
+    const progress = totalSent > 0 ? Math.round((totalReturned / totalSent) * 100) : 0;
+    const progressColor = progress >= 80 ? '#22c55e' : progress >= 50 ? '#f59e0b' : '#ef4444';
 
-    if (lotEntries.length === 0 && dashboardFilters.lotSearch) return '';
+    return {
+      workshopName,
+      totalSent,
+      totalReturned,
+      todayReturned,
+      activeLots: activeLots.length,
+      progress,
+      progressColor,
+      lotMap
+    };
+  }).filter(Boolean);
 
-    const lotRows = lotEntries.map(e => `
-      <div class="ws-lot-row">
-        <div class="ws-lot-name">
-          <strong>${e.lot ? e.lot.id : '?'}</strong>
-          <span>${e.lot ? e.lot.fabricName : ''}</span>
-        </div>
-        <div class="ws-lot-nums">
-          <span class="ws-num blue" title="Đang giữ">${e.inProgress} pcs</span>
-          <span class="ws-num green" title="Đã giao">${e.totalReturned}</span>
-          ${e.defects > 0 ? `<span class="ws-num red" title="Lỗi">${e.defects} lỗi</span>` : ''}
-        </div>
-      </div>
-    `).join('');
-
-    return `<div class="dash-workshop-card">
-      <div class="ws-header">
-        <div class="ws-name">
-          <span class="ws-icon">🏭</span>
-          <span>${workshopName}</span>
-        </div>
-        <div class="ws-badge-row">
-          <span class="ws-stat-badge blue">${totalHolding} đang may</span>
-          ${totalDefects > 0 ? `<span class="ws-stat-badge red">${totalDefects} lỗi</span>` : `<span class="ws-stat-badge green">0 lỗi</span>`}
-        </div>
-      </div>
-      <div class="ws-lots">${lotRows}</div>
-    </div>`;
-  }).filter(Boolean).join('');
+  const workshopCards = workshopTableData.length > 0 ? `
+    <div class="table-container" style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="border-bottom:2px solid rgba(255,255,255,0.1);">
+            <th style="text-align:left;padding:12px 10px;color:var(--text-muted);font-size:11px;text-transform:uppercase;">Xưởng</th>
+            <th style="text-align:left;padding:12px 10px;color:var(--text-muted);font-size:11px;text-transform:uppercase;min-width:160px;">Công suất</th>
+            <th style="text-align:center;padding:12px 10px;color:var(--text-muted);font-size:11px;text-transform:uppercase;">Lô đang may</th>
+            <th style="text-align:center;padding:12px 10px;color:var(--text-muted);font-size:11px;text-transform:uppercase;">Sản lượng hôm nay</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${workshopTableData.map(w => `
+            <tr class="ws-row-clickable" data-ws="${w.workshopName}" style="border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+              <td style="padding:12px 10px;font-weight:700;font-size:14px;">🏭 ${w.workshopName}</td>
+              <td style="padding:12px 10px;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <span style="font-weight:700;min-width:36px;">${w.progress}%</span>
+                  <div style="flex:1;height:10px;background:rgba(255,255,255,0.08);border-radius:5px;overflow:hidden;">
+                    <div style="width:${w.progress}%;height:100%;background:${w.progressColor};border-radius:5px;transition:width 0.5s;"></div>
+                  </div>
+                </div>
+              </td>
+              <td style="text-align:center;padding:12px 10px;font-weight:700;font-size:15px;color:var(--blue);">${w.activeLots} lô</td>
+              <td style="text-align:center;padding:12px 10px;font-weight:700;font-size:15px;color:var(--green);">${w.todayReturned > 0 ? formatNumber(w.todayReturned) + ' sp' : '—'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>` : '';
 
   // === Build main stat cards ===
   let totalCutAll = 0, totalSewingAll = 0, totalReturnedAll = 0, totalPassedAll = 0, totalFailedAll = 0;
@@ -362,7 +362,7 @@ export function renderDashboard() {
     <!-- Workshop Summary -->
     ${workshopCards ? `<div class="dashboard-section">
       <h3>🏭 Tổng Hợp Theo Xưởng May</h3>
-      <div class="dash-workshop-scroll">${workshopCards}</div>
+      ${workshopCards}
     </div>` : ''}
 
     <!-- Lot Cards -->
@@ -400,6 +400,77 @@ export function renderDashboard() {
         renderDashboard();
         showToast('Đã xóa lô vải và toàn bộ dữ liệu liên quan', 'info');
       }
+    });
+  });
+
+  // === Workshop row click -> popup ===
+  container.querySelectorAll('.ws-row-clickable').forEach(row => {
+    row.addEventListener('click', () => {
+      const wsName = row.dataset.ws;
+      const wsData = workshopTableData.find(w => w.workshopName === wsName);
+      if (!wsData) return;
+
+      const lotEntries = Object.values(wsData.lotMap).filter(e => e.inProgress > 0 || e.totalReturned > 0);
+      const lotRows = lotEntries.map(e => {
+        const lot = e.lot;
+        const lotLabel = lot ? `${(lot.fabricName || '').toUpperCase()}${lot.color ? ' ' + lot.color.toUpperCase() : ''}` : '?';
+        const customer = lot ? (lot.customerName || '') : '';
+        const pct = e.totalSent > 0 ? Math.round((e.totalReturned / e.totalSent) * 100) : 0;
+        const pctColor = pct >= 100 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
+        return `<tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+          <td style="padding:10px 8px;font-weight:600;">${lotLabel}<div style="font-size:11px;color:var(--text-muted);">${customer}</div></td>
+          <td style="text-align:center;padding:10px 8px;color:var(--blue);font-weight:700;">${formatNumber(e.totalSent)}</td>
+          <td style="text-align:center;padding:10px 8px;color:var(--green);font-weight:700;">${formatNumber(e.totalReturned)}</td>
+          <td style="text-align:center;padding:10px 8px;font-weight:800;font-size:15px;color:${e.inProgress > 0 ? '#facc15' : '#4ade80'};">${e.inProgress > 0 ? formatNumber(e.inProgress) : 'ĐỦ'}</td>
+          <td style="text-align:center;padding:10px 8px;">
+            <div style="display:flex;align-items:center;gap:6px;justify-content:center;">
+              <span style="font-weight:700;color:${pctColor};">${pct}%</span>
+              <div style="width:50px;height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">
+                <div style="width:${Math.min(pct, 100)}%;height:100%;background:${pctColor};border-radius:3px;"></div>
+              </div>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+
+      const popupOverlay = document.createElement('div');
+      popupOverlay.className = 'lot-detail-overlay';
+      popupOverlay.innerHTML = `
+        <div class="lot-detail-popup" style="max-width:650px;">
+          <div class="lot-detail-popup-header">
+            <h3 style="margin:0;font-size:16px;">🏭 ${wsName} — Chi tiết lô vải</h3>
+            <button class="lot-detail-close">&times;</button>
+          </div>
+          <div class="lot-detail-popup-body" style="padding:16px;">
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+              <span style="padding:4px 12px;border-radius:12px;background:rgba(59,130,246,0.12);color:var(--blue);font-weight:600;font-size:12px;">Tổng gửi: ${formatNumber(wsData.totalSent)}</span>
+              <span style="padding:4px 12px;border-radius:12px;background:rgba(34,197,94,0.12);color:var(--green);font-weight:600;font-size:12px;">Đã giao: ${formatNumber(wsData.totalReturned)}</span>
+              <span style="padding:4px 12px;border-radius:12px;background:rgba(234,179,8,0.12);color:#facc15;font-weight:600;font-size:12px;">Còn lại: ${formatNumber(Math.max(0, wsData.totalSent - wsData.totalReturned))}</span>
+              <span style="padding:4px 12px;border-radius:12px;background:rgba(139,92,246,0.12);color:#a78bfa;font-weight:600;font-size:12px;">Hoàn thành: ${wsData.progress}%</span>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead>
+                <tr style="border-bottom:2px solid rgba(255,255,255,0.1);">
+                  <th style="text-align:left;padding:8px;color:var(--text-muted);font-size:10px;">LÔ VẢI</th>
+                  <th style="text-align:center;padding:8px;color:var(--blue);font-size:10px;">ĐÃ GỬI</th>
+                  <th style="text-align:center;padding:8px;color:var(--green);font-size:10px;">ĐÃ GIAO</th>
+                  <th style="text-align:center;padding:8px;color:#facc15;font-size:10px;">CÒN LẠI</th>
+                  <th style="text-align:center;padding:8px;color:var(--text-muted);font-size:10px;">TIẾN ĐỘ</th>
+                </tr>
+              </thead>
+              <tbody>${lotRows}</tbody>
+            </table>
+          </div>
+          <div style="padding:12px 16px;text-align:right;border-top:1px solid rgba(255,255,255,0.06);">
+            <button class="lot-detail-close" style="padding:8px 24px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);cursor:pointer;font-size:13px;">Đóng</button>
+          </div>
+        </div>`;
+      document.body.appendChild(popupOverlay);
+      requestAnimationFrame(() => popupOverlay.classList.add('active'));
+      popupOverlay.querySelectorAll('.lot-detail-close').forEach(btn => {
+        btn.addEventListener('click', () => { popupOverlay.classList.remove('active'); setTimeout(() => popupOverlay.remove(), 200); });
+      });
+      popupOverlay.addEventListener('click', (e) => { if (e.target === popupOverlay) { popupOverlay.classList.remove('active'); setTimeout(() => popupOverlay.remove(), 200); } });
     });
   });
 
