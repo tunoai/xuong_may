@@ -75,16 +75,19 @@ export function renderDashboard() {
   store.getSewings().filter(s => s.status !== 'Done').forEach(s => {
     const lot = store.getLot(s.lotId);
     const sizes = store.getSewingSizes(s.id);
-    const inProg = sizes.reduce((sum, sz) => sum + sz.quantitySent - sz.quantityReturned, 0);
-    if (inProg > 0 && inProg < 10) {
-      const detail = sizes.filter(sz => sz.quantitySent - sz.quantityReturned > 0)
-        .map(sz => `${sz.size}:${sz.quantitySent - sz.quantityReturned}`).join(', ');
+    const lowSizes = sizes.filter(sz => {
+      const rem = sz.quantitySent - sz.quantityReturned;
+      return rem > 0 && rem < 10;
+    });
+    if (lowSizes.length > 0) {
+      const detail = lowSizes.map(sz => `${sz.size}:${sz.quantitySent - sz.quantityReturned}`).join(', ');
+      const minRem = Math.min(...lowSizes.map(sz => sz.quantitySent - sz.quantityReturned));
       const lotName = lot ? `${(lot.fabricName || '').toUpperCase()}${lot.color ? ' ' + lot.color.toUpperCase() : ''} - ${lot.customerName || ''}` : s.workshopName;
       sewingAlerts.push({ 
         type: 'urgent', 
         icon: '⏳', 
-        text: `${lotName} (${s.workshopName}): ${inProg} pcs đang may [${detail}] - SẮP HẾT`,
-        inProg: inProg,
+        text: `${lotName} (${s.workshopName}): [${detail}] - SẮP HẾT`,
+        inProg: minRem,
         lotId: s.lotId
       });
     }
