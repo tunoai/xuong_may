@@ -365,18 +365,18 @@ export function renderDashboard() {
       ${workshopCards}
     </div>` : ''}
 
+    <!-- NHẬN HÀNG TỪ XƯỞNG MAY -->
+    <div class="dashboard-section" style="margin-top:20px;">
+      <h3>📦 Nhận Hàng Từ Xưởng May</h3>
+      <div id="delivery-chart-section"></div>
+    </div>
+
     <!-- Lot Cards -->
     <div class="dashboard-section">
       <h3>📋 Chi Tiết Từng Lô <span class="dash-count-badge">${filteredLots.length} lô</span></h3>
       <div class="dash-lot-scroll">
         ${lotCards || '<div class="empty-state"><p>Không tìm thấy lô vải phù hợp</p></div>'}
       </div>
-    </div>
-
-    <!-- NHẬN HÀNG TỪ XƯỞNG MAY -->
-    <div class="dashboard-section" style="margin-top:20px;">
-      <h3>📦 Nhận Hàng Từ Xưởng May</h3>
-      <div id="delivery-chart-section"></div>
     </div>
   `;
 
