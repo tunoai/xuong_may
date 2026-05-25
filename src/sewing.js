@@ -447,12 +447,20 @@ export function renderSewingTable() {
     const prioSizes = lot ? store.getPrioritySizes(lot.id) : [];
     const hasPrio = prioSizes.length > 0;
     
-    // Display: sizes Sent vs Returned
+    // Display: sizes Sent vs Returned + Remaining
     const sizeDisplay = sizes.filter(s => s.quantitySent > 0).map(s => {
       const isPrio = prioSizes.includes(s.size);
-      return `<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;${isPrio ? 'background:rgba(245,158,11,0.08);padding:2px 6px;border-radius:3px;border-left:2px solid #f59e0b' : ''}">
+      const remaining = s.quantitySent - s.quantityReturned;
+      const isLow = remaining > 0 && remaining < 10;
+      const isDone = remaining <= 0;
+      const remainColor = isDone ? 'var(--green)' : isLow ? 'var(--red)' : 'var(--yellow)';
+      const remainBg = isDone ? 'rgba(34,197,94,0.15)' : isLow ? 'rgba(239,68,68,0.2)' : 'rgba(234,179,8,0.15)';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:4px;${isPrio ? 'background:rgba(245,158,11,0.08);padding:2px 6px;border-radius:3px;border-left:2px solid #f59e0b' : ''}">
         <span><strong>${isPrio ? '⭐ ' : ''}${s.size}</strong></span>
-        <span>${s.quantityReturned} / ${s.quantitySent}</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="color:var(--text-muted)">${s.quantityReturned} / ${s.quantitySent}</span>
+          <span style="background:${remainBg};color:${remainColor};font-weight:800;font-size:11px;padding:1px 6px;border-radius:4px;min-width:20px;text-align:center;${isLow ? 'animation:pulse-low 1.5s ease-in-out infinite;' : ''}">${isDone ? '✓' : remaining}</span>
+        </div>
       </div>`;
     }).join('');
 
