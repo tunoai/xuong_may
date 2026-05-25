@@ -49,6 +49,10 @@ class Store {
     this.notify();
   }
 
+  forceSync() {
+    saveToFirestore(this.data);
+  }
+
   notify() {
     this.listeners.forEach(fn => fn(this.data));
   }

@@ -91,6 +91,12 @@ function init() {
     e.target.value = '';
   });
 
+  // Force Sync to Firebase
+  document.getElementById('btn-sync-cloud').addEventListener('click', () => {
+    store.forceSync();
+    showToast('☁️ Đang đồng bộ toàn bộ dữ liệu lên Firebase...');
+  });
+
   // Init first module
   initFabricModule();
   initSewingModule();
