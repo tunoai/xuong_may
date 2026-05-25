@@ -11,7 +11,8 @@ let filtersRendered = false;
 let dashboardFilters = {
   lotSearch: '',
   workshopSearch: '',
-  materialSearch: '',
+  dateFrom: '',
+  dateTo: '',
   prioOnly: false
 };
 
@@ -47,14 +48,14 @@ export function renderDashboard() {
       wsSelect.innerHTML = newOpts;
     }
     // Update clear button visibility
-    const hasFilter = dashboardFilters.lotSearch || dashboardFilters.workshopSearch || dashboardFilters.materialSearch || dashboardFilters.prioOnly;
+    const hasFilter = dashboardFilters.lotSearch || dashboardFilters.workshopSearch || dashboardFilters.dateFrom || dashboardFilters.dateTo || dashboardFilters.prioOnly;
     const clearBtn = document.getElementById('dash-filter-clear');
     if (clearBtn) clearBtn.style.display = hasFilter ? '' : 'none';
     else if (hasFilter) {
       const bar = document.getElementById('dash-filter-bar-inner');
       if (bar) bar.insertAdjacentHTML('beforeend', `<button class="dash-filter-clear" id="dash-filter-clear" style="">✕ Xóa bộ lọc</button>`);
       document.getElementById('dash-filter-clear')?.addEventListener('click', () => {
-        dashboardFilters = { lotSearch: '', workshopSearch: '', materialSearch: '', prioOnly: false };
+        dashboardFilters = { lotSearch: '', workshopSearch: '', dateFrom: '', dateTo: '', prioOnly: false };
         filtersRendered = false;
         renderDashboard();
       });
@@ -115,6 +116,12 @@ export function renderDashboard() {
       const lotSewings = store.getSewingsByLot(lot.id);
       const hasWorkshop = lotSewings.some(s => (s.workshopName || '').toLowerCase().includes(q));
       if (!hasWorkshop) return false;
+    }
+    if (dashboardFilters.dateFrom && lot.dateReceived) {
+      if (lot.dateReceived < dashboardFilters.dateFrom) return false;
+    }
+    if (dashboardFilters.dateTo && lot.dateReceived) {
+      if (lot.dateReceived > dashboardFilters.dateTo) return false;
     }
     return true;
   });
@@ -363,10 +370,6 @@ export function renderDashboard() {
   });
 
   const materialRows = Object.values(materialStats).filter(m => {
-    if (dashboardFilters.materialSearch) {
-       const q = dashboardFilters.materialSearch.toLowerCase();
-       if (!m.name.toLowerCase().includes(q)) return false;
-    }
     return true;
   }).map(m => {
     const isShort = m.stock < m.required;
@@ -451,7 +454,7 @@ export function renderDashboard() {
 
 function renderFilterBar(filterBarEl, allWorkshops) {
   const workshopOptions = allWorkshops.map(w => `<option value="${w}" ${w === dashboardFilters.workshopSearch ? 'selected' : ''}>${w}</option>`).join('');
-  const hasFilter = dashboardFilters.lotSearch || dashboardFilters.workshopSearch || dashboardFilters.materialSearch || dashboardFilters.prioOnly;
+  const hasFilter = dashboardFilters.lotSearch || dashboardFilters.workshopSearch || dashboardFilters.dateFrom || dashboardFilters.dateTo || dashboardFilters.prioOnly;
 
   filterBarEl.innerHTML = `
     <div class="dash-filter-bar" id="dash-filter-bar-inner">
@@ -467,8 +470,12 @@ function renderFilterBar(filterBarEl, allWorkshops) {
         </select>
       </div>
       <div class="dash-filter-item">
-        <span class="dash-filter-icon">📦</span>
-        <input type="text" id="dash-filter-material" placeholder="Lọc phụ liệu..." value="${dashboardFilters.materialSearch}" autocomplete="off" />
+        <span class="dash-filter-icon">📅</span>
+        <input type="date" id="dash-filter-date-from" value="${dashboardFilters.dateFrom}" title="Từ ngày" style="font-size:12px;" />
+      </div>
+      <div class="dash-filter-item">
+        <span class="dash-filter-icon">📅</span>
+        <input type="date" id="dash-filter-date-to" value="${dashboardFilters.dateTo}" title="Đến ngày" style="font-size:12px;" />
       </div>
       <button class="dash-filter-btn${dashboardFilters.prioOnly ? ' active' : ''}" id="dash-filter-prio" title="Chỉ hiện lô có size ưu tiên">
         ⭐ Size Ưu Tiên
@@ -480,7 +487,8 @@ function renderFilterBar(filterBarEl, allWorkshops) {
   // Setup listeners
   const lotInput = document.getElementById('dash-filter-lot');
   const workshopSelect = document.getElementById('dash-filter-workshop');
-  const matInput = document.getElementById('dash-filter-material');
+  const dateFromInput = document.getElementById('dash-filter-date-from');
+  const dateToInput = document.getElementById('dash-filter-date-to');
   const prioBtn = document.getElementById('dash-filter-prio');
   const clearBtn = document.getElementById('dash-filter-clear');
 
@@ -489,16 +497,24 @@ function renderFilterBar(filterBarEl, allWorkshops) {
     clearTimeout(debounce);
     debounce = setTimeout(() => {
       dashboardFilters.lotSearch = lotInput?.value || '';
-      dashboardFilters.materialSearch = matInput?.value || '';
       renderDashboard();
     }, 300);
   };
 
   lotInput?.addEventListener('input', triggerTextFilter);
-  matInput?.addEventListener('input', triggerTextFilter);
 
   workshopSelect?.addEventListener('change', () => {
     dashboardFilters.workshopSearch = workshopSelect.value;
+    renderDashboard();
+  });
+
+  dateFromInput?.addEventListener('change', () => {
+    dashboardFilters.dateFrom = dateFromInput.value;
+    renderDashboard();
+  });
+
+  dateToInput?.addEventListener('change', () => {
+    dashboardFilters.dateTo = dateToInput.value;
     renderDashboard();
   });
 
@@ -508,7 +524,7 @@ function renderFilterBar(filterBarEl, allWorkshops) {
   });
 
   clearBtn?.addEventListener('click', () => {
-    dashboardFilters = { lotSearch: '', workshopSearch: '', materialSearch: '', prioOnly: false };
+    dashboardFilters = { lotSearch: '', workshopSearch: '', dateFrom: '', dateTo: '', prioOnly: false };
     filtersRendered = false;
     renderDashboard();
   });
