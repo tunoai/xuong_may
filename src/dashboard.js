@@ -67,21 +67,24 @@ export function renderDashboard() {
   // === Alerts ===
   const alerts = [];
   lots.filter(l => l.priority === 'Urgent' || l.priority === 'Very Urgent').forEach(l => {
-    alerts.push({ type: 'urgent', icon: '⚠️', text: `${l.id} - ${l.customerName}: ${l.priority}` });
+    const lotName = `${(l.fabricName || '').toUpperCase()}${l.color ? ' ' + l.color.toUpperCase() : ''} - ${l.customerName || ''}`;
+    alerts.push({ type: 'urgent', icon: '⚠️', text: `${lotName}: ${l.priority}` });
   });
 
   const sewingAlerts = [];
   store.getSewings().filter(s => s.status !== 'Done').forEach(s => {
+    const lot = store.getLot(s.lotId);
     const sizes = store.getSewingSizes(s.id);
     const inProg = sizes.reduce((sum, sz) => sum + sz.quantitySent - sz.quantityReturned, 0);
     if (inProg > 0) {
       const detail = sizes.filter(sz => sz.quantitySent - sz.quantityReturned > 0)
         .map(sz => `${sz.size}:${sz.quantitySent - sz.quantityReturned}`).join(', ');
       const isAlmostDone = inProg < 10;
+      const lotName = lot ? `${(lot.fabricName || '').toUpperCase()}${lot.color ? ' ' + lot.color.toUpperCase() : ''} - ${lot.customerName || ''}` : s.workshopName;
       sewingAlerts.push({ 
         type: isAlmostDone ? 'urgent' : 'info', 
         icon: isAlmostDone ? '⏳' : '🪡', 
-        text: `${s.id} (${s.workshopName}): ${inProg} pcs đang may [${detail}]${isAlmostDone ? ' - Sắp xong' : ''}`,
+        text: `${lotName} (${s.workshopName}): ${inProg} pcs đang may [${detail}]${isAlmostDone ? ' - SẮP HẾT' : ''}`,
         inProg: inProg 
       });
     }
