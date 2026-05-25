@@ -173,6 +173,62 @@ export function initSewingModule() {
       exportActiveSewingsToExcel();
       return;
     }
+
+    // Batch QC All
+    const batchQcAllBtn = e.target.closest('.btn-batch-qc-all');
+    if (batchQcAllBtn) {
+      e.stopPropagation();
+      if (confirm('Bạn có chắc muốn duyệt Pass 100% tất cả các thẻ đang chờ QC?')) {
+        const allDeliveries = store.getDeliveries();
+        const deliveriesQC = allDeliveries.filter(d => d.status === 'QC');
+        let count = 0;
+        deliveriesQC.forEach(delivery => {
+          const sewing = store.getSewing(delivery.sewingId);
+          if (!sewing) return;
+          const sizes = store.getDeliverySizes(delivery.id);
+          const results = sizes.map(s => ({
+            size: s.size, checked: s.quantity, passed: s.quantity, failed: 0
+          }));
+          const savedQC = store.addQC({
+            sewingId: sewing.id,
+            deliveryId: delivery.id,
+            dateQC: new Date().toISOString().split('T')[0],
+            inspectorName: '',
+            notes: 'Auto Pass 100%'
+          });
+          store.setQCResults(savedQC.id, results);
+          store.updateDelivery(delivery.id, { status: 'QC_Done' });
+          count++;
+        });
+        renderSewingTable();
+        showToast(`Đã tự động Pass 100% cho ${count} thẻ QC!`, 'success');
+      }
+      return;
+    }
+
+    // Batch Approve All
+    const batchApproveAllBtn = e.target.closest('.btn-batch-approve-all');
+    if (batchApproveAllBtn) {
+      e.stopPropagation();
+      if (confirm('Bạn có chắc muốn Hoàn thành tất cả các thẻ duyệt Pass?')) {
+        const pendingQCRecords = store.getQCs().filter(q => q.passAction === 'Pending');
+        let count = 0;
+        pendingQCRecords.forEach(qc => {
+          const results = store.getQCResults(qc.id);
+          if (results.some(r => r.passed > 0)) {
+            store.updateQC(qc.id, { passAction: 'Done' });
+            count++;
+          }
+        });
+        renderSewingTable();
+        if (count > 0) {
+          showToast(`Đã chuyển ${count} thẻ duyệt Pass vào Lịch sử!`, 'success');
+        } else {
+          showToast('Không có thẻ nào cần duyệt.', 'info');
+        }
+      }
+      return;
+    }
   });
 
   window.handleSewingDragStart = (e) => {
@@ -531,8 +587,11 @@ export function renderSewingTable() {
     </div>
 
     <div class="kanban-col" id="col-sewing-qc" ondragover="handleSewingDragOver(event)" ondrop="handleSewingDrop(event, 'qc')">
-      <div class="kanban-col-header" style="border-bottom-color:var(--green)">
-        QC KIỂM TRA <span class="badge" style="background:var(--green)">${deliveriesQC.length}</span>
+      <div class="kanban-col-header" style="border-bottom-color:var(--green); flex-direction:column; align-items:flex-start;">
+        <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+          <span>QC KIỂM TRA</span> <span class="badge" style="background:var(--green)">${deliveriesQC.length}</span>
+        </div>
+        ${deliveriesQC.length > 0 ? `<button class="btn btn-xs btn-batch-qc-all" style="margin-top:6px;width:100%;background:linear-gradient(135deg,#22c55e,#16a34a);border:none;color:#fff;font-weight:600;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;gap:4px;transition:all .2s;box-shadow:0 2px 8px rgba(34,197,94,0.3)">✔️ QC Tất Cả (Pass 100%)</button>` : ''}
       </div>
       <div class="kanban-cards">
         ${deliveriesQC.map(d => renderDeliveryCard(d, true)).join('')}
@@ -541,8 +600,11 @@ export function renderSewingTable() {
     </div>
 
     <div class="kanban-col" id="col-sewing-qc-result">
-      <div class="kanban-col-header" style="border-bottom-color:var(--yellow)">
-        DUYỆT - TRẢ <span class="badge" style="background:var(--yellow)">${getQCCount()}</span>
+      <div class="kanban-col-header" style="border-bottom-color:var(--yellow); flex-direction:column; align-items:flex-start;">
+        <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+          <span>DUYỆT - TRẢ</span> <span class="badge" style="background:var(--yellow)">${getQCCount()}</span>
+        </div>
+        ${pendingQCRecords.some(q => q.passAction === 'Pending' && store.getQCResults(q.id).some(r => r.passed > 0)) ? `<button class="btn btn-xs btn-batch-approve-all" style="margin-top:6px;width:100%;background:linear-gradient(135deg,#eab308,#ca8a04);border:none;color:#fff;font-weight:600;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;gap:4px;transition:all .2s;box-shadow:0 2px 8px rgba(234,179,8,0.3)">✅ Duyệt Tất Cả</button>` : ''}
       </div>
       <div class="kanban-cards">
         ${pendingQCRecords.map(q => {
