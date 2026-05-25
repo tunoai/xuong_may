@@ -569,9 +569,8 @@ function showLotDetailPopup(lotId) {
     const remBg = isDone ? 'rgba(34,197,94,0.12)' : isLow ? 'rgba(239,68,68,0.12)' : 'rgba(234,179,8,0.12)';
     return `<tr style="${isPrio ? 'background:rgba(245,158,11,0.06);' : ''}">
       <td style="font-weight:700;font-size:14px;">${isPrio ? '⭐ ' : ''}${s.size}</td>
-      <td style="text-align:center;font-weight:800;font-size:16px;padding:6px 12px;background:${remBg};color:${remColor};border-radius:6px;">${isDone ? '✓' : rem}</td>
+      <td style="text-align:center;font-weight:800;font-size:16px;padding:6px 12px;background:${remBg};color:${remColor};border-radius:6px;">${isDone ? 'ĐỦ' : rem}</td>
       <td style="text-align:center;color:var(--blue)">${s.cut}</td>
-      <td style="text-align:center;color:var(--orange)">${s.inProgress}</td>
       <td style="text-align:center;color:var(--green)">${s.passed}</td>
       <td style="text-align:center;color:var(--red)">${s.failed}</td>
     </tr>`;
@@ -587,7 +586,7 @@ function showLotDetailPopup(lotId) {
       .map(sz => `<span style="display:inline-block;margin:2px 4px;padding:2px 8px;background:rgba(234,179,8,0.12);border-radius:4px;font-size:11px;color:#facc15;font-weight:600">${sz.size}: ${sz.quantitySent - sz.quantityReturned}</span>`)
       .join('');
     const doneDetail = sizes.filter(sz => sz.quantitySent - sz.quantityReturned <= 0 && sz.quantitySent > 0)
-      .map(sz => `<span style="display:inline-block;margin:2px 4px;padding:2px 8px;background:rgba(34,197,94,0.12);border-radius:4px;font-size:11px;color:#4ade80;font-weight:600">${sz.size}: ✓</span>`)
+      .map(sz => `<span style="display:inline-block;margin:2px 4px;padding:2px 8px;background:rgba(34,197,94,0.12);border-radius:4px;font-size:11px;color:#4ade80;font-weight:600">${sz.size}: ĐỦ</span>`)
       .join('');
     return `<div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -597,7 +596,7 @@ function showLotDetailPopup(lotId) {
       <div style="display:flex;gap:12px;font-size:12px;margin-bottom:6px;">
         <span>Gửi: <strong style="color:var(--blue)">${totalSent}</strong></span>
         <span>Giao: <strong style="color:var(--green)">${totalReturned}</strong></span>
-        <span>Còn: <strong style="color:${remaining > 0 ? 'var(--yellow)' : 'var(--green)'}">${remaining > 0 ? remaining : '✓'}</strong></span>
+        <span>Còn: <strong style="color:${remaining > 0 ? 'var(--yellow)' : 'var(--green)'}">${remaining > 0 ? remaining : 'ĐỦ'}</strong></span>
       </div>
       <div>${sizeDetail}${doneDetail}</div>
     </div>`;
@@ -636,14 +635,13 @@ function showLotDetailPopup(lotId) {
             <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-size:10px;">SIZE</th>
             <th style="text-align:center;padding:6px 8px;color:#facc15;font-size:10px;">CÒN LẠI</th>
             <th style="text-align:center;padding:6px 8px;color:var(--blue);font-size:10px;">CẮT</th>
-            <th style="text-align:center;padding:6px 8px;color:var(--orange);font-size:10px;">ĐANG MAY</th>
-            <th style="text-align:center;padding:6px 8px;color:var(--green);font-size:10px;">PASS</th>
+            <th style="text-align:center;padding:6px 8px;color:var(--green);font-size:10px;">ĐÃ GIAO</th>
             <th style="text-align:center;padding:6px 8px;color:var(--red);font-size:10px;">LỖI</th>
           </tr>
         </thead>
         <tbody>
           ${remainingSizes.map(s => buildSizeRow(s)).join('')}
-          ${doneSizes.length > 0 && remainingSizes.length > 0 ? '<tr><td colspan="6" style="padding:4px 0;"><div style="border-top:1px dashed rgba(34,197,94,0.3);"></div></td></tr>' : ''}
+          ${doneSizes.length > 0 && remainingSizes.length > 0 ? '<tr><td colspan="5" style="padding:4px 0;"><div style="border-top:1px dashed rgba(34,197,94,0.3);"></div></td></tr>' : ''}
           ${doneSizes.map(s => buildSizeRow(s)).join('')}
         </tbody>
       </table>
