@@ -381,30 +381,6 @@ export function renderDashboard() {
   }).join('');
 
   container.innerHTML = `
-    <!-- OVERVIEW STATS -->
-    <div class="stat-row">
-      <div class="stat-card blue">
-        <div class="stat-label">Tổng Đã Cắt</div>
-        <div class="stat-value">${formatNumber(totalCutAll)}<span class="stat-unit">pcs</span></div>
-      </div>
-      <div class="stat-card orange">
-        <div class="stat-label">Đang May</div>
-        <div class="stat-value">${formatNumber(totalSewingAll)}<span class="stat-unit">pcs</span></div>
-      </div>
-      <div class="stat-card green">
-        <div class="stat-label">QC Đạt</div>
-        <div class="stat-value">${formatNumber(totalPassedAll)}<span class="stat-unit">pcs</span></div>
-      </div>
-      <div class="stat-card red">
-        <div class="stat-label">Hàng Lỗi</div>
-        <div class="stat-value">${formatNumber(totalFailedAll)}<span class="stat-unit">pcs</span></div>
-      </div>
-      <div class="stat-card yellow">
-        <div class="stat-label">Tiến Độ Chung</div>
-        <div class="stat-value">${overallProgress}<span class="stat-unit">%</span></div>
-      </div>
-    </div>
-
     <!-- Alerts -->
     ${alerts.length > 0 ? `<div class="dashboard-section">
       <h3>🚨 Cảnh Báo (${alerts.length})</h3>
