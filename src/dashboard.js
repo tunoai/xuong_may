@@ -16,6 +16,13 @@ let dashboardFilters = {
   prioOnly: false
 };
 
+// Delivery chart filter (independent)
+const nowDate = new Date();
+let deliveryFilter = {
+  from: new Date(nowDate.getFullYear(), nowDate.getMonth(), 1).toISOString().split('T')[0],
+  to: nowDate.toISOString().split('T')[0]
+};
+
 export function renderDashboard() {
   const lots = store.getLots();
   const container = document.getElementById('dashboard-content');
@@ -345,53 +352,6 @@ export function renderDashboard() {
   });
   const overallProgress = totalCutAll > 0 ? Math.round((totalPassedAll / totalCutAll) * 100) : 0;
 
-  // === Daily Delivery Data (NHẬN HÀNG TỪ XƯỞNG MAY) ===
-  const allDeliveries = store.getDeliveries();
-  const dailyDeliveryMap = {};
-  const workshopDailyMap = {};
-  allDeliveries.forEach(d => {
-    const dateStr = d.createdAt ? d.createdAt.split('T')[0] : '';
-    if (!dateStr) return;
-    const sewing = store.getSewing(d.sewingId);
-    const workshopName = sewing ? (sewing.workshopName || 'Khác') : 'Khác';
-    const sizes = store.getDeliverySizes(d.id);
-    const totalQty = sizes.reduce((sum, sz) => sum + sz.quantity, 0);
-    
-    if (!dailyDeliveryMap[dateStr]) dailyDeliveryMap[dateStr] = 0;
-    dailyDeliveryMap[dateStr] += totalQty;
-
-    if (!workshopDailyMap[workshopName]) workshopDailyMap[workshopName] = {};
-    if (!workshopDailyMap[workshopName][dateStr]) workshopDailyMap[workshopName][dateStr] = 0;
-    workshopDailyMap[workshopName][dateStr] += totalQty;
-  });
-
-  // Get last 14 days
-  const today = new Date();
-  const last14Days = [];
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date(today); d.setDate(d.getDate() - i);
-    last14Days.push(d.toISOString().split('T')[0]);
-  }
-  const dailyLabels = last14Days.map(d => { const p = d.split('-'); return `${p[2]}/${p[1]}`; });
-  const dailyValues = last14Days.map(d => dailyDeliveryMap[d] || 0);
-
-  // Workshop breakdown table rows
-  const wsNames = Object.keys(workshopDailyMap);
-  const workshopTableRows = wsNames.map(ws => {
-    const dailyVals = last14Days.map(d => workshopDailyMap[ws][d] || 0);
-    const total = dailyVals.reduce((a, b) => a + b, 0);
-    const daysWorked = dailyVals.filter(v => v > 0).length;
-    const avg = daysWorked > 0 ? Math.round(total / daysWorked) : 0;
-    const max = Math.max(...dailyVals);
-    return `<tr>
-      <td style="font-weight:700;">${ws}</td>
-      <td style="text-align:center;color:var(--blue);font-weight:800;">${formatNumber(total)}</td>
-      <td style="text-align:center;color:var(--green);font-weight:600;">${formatNumber(avg)}</td>
-      <td style="text-align:center;color:var(--yellow);">${formatNumber(max)}</td>
-      <td style="text-align:center;">${daysWorked} ngày</td>
-    </tr>`;
-  }).join('');
-
   container.innerHTML = `
     <!-- Alerts -->
     ${alerts.length > 0 ? `<div class="dashboard-section">
@@ -415,32 +375,8 @@ export function renderDashboard() {
 
     <!-- NHẬN HÀNG TỪ XƯỞNG MAY -->
     <div class="dashboard-section" style="margin-top:20px;">
-      <h3>📦 Nhận Hàng Từ Xưởng May <span style="font-size:12px; font-weight:400; color:var(--text-muted)">(14 ngày gần nhất)</span></h3>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;">
-          <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:10px;">Biểu đồ giao hàng theo ngày</div>
-          <div class="chart-container" style="height:250px;">
-            <canvas id="daily-delivery-chart"></canvas>
-          </div>
-        </div>
-        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;">
-          <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:10px;">🏭 Năng lực sản xuất theo xưởng</div>
-          <table style="width:100%;border-collapse:collapse;font-size:12px;">
-            <thead>
-              <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
-                <th style="text-align:left;padding:8px 6px;color:var(--text-muted);font-size:10px;">XƯỞNG</th>
-                <th style="text-align:center;padding:8px 6px;color:var(--blue);font-size:10px;">TỔNG GIAO</th>
-                <th style="text-align:center;padding:8px 6px;color:var(--green);font-size:10px;">TB/NGÀY</th>
-                <th style="text-align:center;padding:8px 6px;color:var(--yellow);font-size:10px;">CAO NHẤT</th>
-                <th style="text-align:center;padding:8px 6px;color:var(--text-muted);font-size:10px;">SỐ NGÀY</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${workshopTableRows || '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">Chưa có dữ liệu giao hàng</td></tr>'}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <h3>📦 Nhận Hàng Từ Xưởng May</h3>
+      <div id="delivery-chart-section"></div>
     </div>
   `;
 
@@ -459,7 +395,7 @@ export function renderDashboard() {
       const lotId = btn.dataset.lotId;
       const lot = store.getLot(lotId);
       const lotName = lot ? `${lot.fabricName || ''} ${lot.color || ''} - ${lot.customerName || ''}` : lotId;
-      if (confirm(`Bạn có chắc muốn xóa lô vải "${lotName}"?\nToàn bộ dữ liệu cắt, may, QC của lô này sẽ bị xóa.`)) {
+      if (confirm(`Bạn có chắc muốn xóa lô vải \"${lotName}\"?\nToàn bộ dữ liệu cắt, may, QC của lô này sẽ bị xóa.`)) {
         store.deleteLot(lotId);
         renderDashboard();
         showToast('Đã xóa lô vải và toàn bộ dữ liệu liên quan', 'info');
@@ -467,20 +403,149 @@ export function renderDashboard() {
     });
   });
 
-  // === Render Daily Delivery Chart ===
+  // === Render Delivery Chart Section ===
+  renderDeliveryChart();
+}
+
+let deliveryChartInstance = null;
+
+function renderDeliveryChart() {
+  const section = document.getElementById('delivery-chart-section');
+  if (!section) return;
+
+  const today = new Date();
+  const curMonth = today.getMonth();
+  const curYear = today.getFullYear();
+
+  // Quick filter helpers
+  const quickFilters = [
+    { label: '7 ngày', from: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6).toISOString().split('T')[0], to: today.toISOString().split('T')[0] },
+    { label: '14 ngày', from: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 13).toISOString().split('T')[0], to: today.toISOString().split('T')[0] },
+    { label: 'Tháng này', from: new Date(curYear, curMonth, 1).toISOString().split('T')[0], to: today.toISOString().split('T')[0] },
+    { label: 'Tháng trước', from: new Date(curYear, curMonth - 1, 1).toISOString().split('T')[0], to: new Date(curYear, curMonth, 0).toISOString().split('T')[0] },
+    { label: 'Năm nay', from: new Date(curYear, 0, 1).toISOString().split('T')[0], to: today.toISOString().split('T')[0] },
+  ];
+
+  // Compute data based on deliveryFilter
+  const allDeliveries = store.getDeliveries();
+  const dailyDeliveryMap = {};
+  const workshopDailyMap = {};
+  allDeliveries.forEach(d => {
+    const dateStr = d.createdAt ? d.createdAt.split('T')[0] : '';
+    if (!dateStr) return;
+    if (deliveryFilter.from && dateStr < deliveryFilter.from) return;
+    if (deliveryFilter.to && dateStr > deliveryFilter.to) return;
+    const sewing = store.getSewing(d.sewingId);
+    const workshopName = sewing ? (sewing.workshopName || 'Khác') : 'Khác';
+    const sizes = store.getDeliverySizes(d.id);
+    const totalQty = sizes.reduce((sum, sz) => sum + sz.quantity, 0);
+    if (!dailyDeliveryMap[dateStr]) dailyDeliveryMap[dateStr] = 0;
+    dailyDeliveryMap[dateStr] += totalQty;
+    if (!workshopDailyMap[workshopName]) workshopDailyMap[workshopName] = {};
+    if (!workshopDailyMap[workshopName][dateStr]) workshopDailyMap[workshopName][dateStr] = 0;
+    workshopDailyMap[workshopName][dateStr] += totalQty;
+  });
+
+  // Build date range array
+  const dateRange = [];
+  const startD = new Date(deliveryFilter.from || today.toISOString().split('T')[0]);
+  const endD = new Date(deliveryFilter.to || today.toISOString().split('T')[0]);
+  for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
+    dateRange.push(d.toISOString().split('T')[0]);
+  }
+  const dailyLabels = dateRange.map(d => { const p = d.split('-'); return `${p[2]}/${p[1]}`; });
+
+  const wsNames = Object.keys(workshopDailyMap);
+  const workshopTableRows = wsNames.map(ws => {
+    const dailyVals = dateRange.map(d => workshopDailyMap[ws][d] || 0);
+    const total = dailyVals.reduce((a, b) => a + b, 0);
+    const daysWorked = dailyVals.filter(v => v > 0).length;
+    const avg = daysWorked > 0 ? Math.round(total / daysWorked) : 0;
+    const max = Math.max(...dailyVals, 0);
+    return `<tr>
+      <td style="font-weight:700;">${ws}</td>
+      <td style="text-align:center;color:var(--blue);font-weight:800;">${formatNumber(total)}</td>
+      <td style="text-align:center;color:var(--green);font-weight:600;">${formatNumber(avg)}</td>
+      <td style="text-align:center;color:var(--yellow);">${formatNumber(max)}</td>
+      <td style="text-align:center;">${daysWorked} ngày</td>
+    </tr>`;
+  }).join('');
+
+  // Active quick filter check
+  const activeIdx = quickFilters.findIndex(q => q.from === deliveryFilter.from && q.to === deliveryFilter.to);
+
+  section.innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:14px;">
+      ${quickFilters.map((q, i) => `<button class="delivery-quick-btn${i === activeIdx ? ' active' : ''}" data-idx="${i}" style="padding:5px 12px;font-size:11px;font-weight:600;border-radius:6px;border:1px solid ${i === activeIdx ? 'var(--accent)' : 'var(--border)'};background:${i === activeIdx ? 'rgba(59,130,246,0.15)' : 'var(--bg-card)'};color:${i === activeIdx ? 'var(--accent)' : 'var(--text-muted)'};cursor:pointer;transition:all 0.2s;">${q.label}</button>`).join('')}
+      <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+        <label style="font-size:11px;color:var(--text-muted);font-weight:600;">Từ</label>
+        <input type="date" id="delivery-from" value="${deliveryFilter.from}" style="font-size:11px;padding:4px 8px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);" />
+        <label style="font-size:11px;color:var(--text-muted);font-weight:600;">Đến</label>
+        <input type="date" id="delivery-to" value="${deliveryFilter.to}" style="font-size:11px;padding:4px 8px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);" />
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:10px;">Biểu đồ giao hàng theo ngày</div>
+        <div class="chart-container" style="height:250px;">
+          <canvas id="daily-delivery-chart"></canvas>
+        </div>
+      </div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:10px;">🏭 Năng lực sản xuất theo xưởng</div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
+              <th style="text-align:left;padding:8px 6px;color:var(--text-muted);font-size:10px;">XƯỞNG</th>
+              <th style="text-align:center;padding:8px 6px;color:var(--blue);font-size:10px;">TỔNG GIAO</th>
+              <th style="text-align:center;padding:8px 6px;color:var(--green);font-size:10px;">TB/NGÀY</th>
+              <th style="text-align:center;padding:8px 6px;color:var(--yellow);font-size:10px;">CAO NHẤT</th>
+              <th style="text-align:center;padding:8px 6px;color:var(--text-muted);font-size:10px;">SỐ NGÀY</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${workshopTableRows || '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">Chưa có dữ liệu giao hàng</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  // Quick filter buttons
+  section.querySelectorAll('.delivery-quick-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx);
+      deliveryFilter.from = quickFilters[idx].from;
+      deliveryFilter.to = quickFilters[idx].to;
+      renderDeliveryChart();
+    });
+  });
+
+  // Date inputs
+  document.getElementById('delivery-from')?.addEventListener('change', (e) => {
+    deliveryFilter.from = e.target.value;
+    renderDeliveryChart();
+  });
+  document.getElementById('delivery-to')?.addEventListener('change', (e) => {
+    deliveryFilter.to = e.target.value;
+    renderDeliveryChart();
+  });
+
+  // Render chart
   const deliveryCanvas = document.getElementById('daily-delivery-chart');
   if (deliveryCanvas) {
+    if (deliveryChartInstance) deliveryChartInstance.destroy();
     const ctx = deliveryCanvas.getContext('2d');
     const wsColors = ['#3b82f6', '#f59e0b', '#22c55e', '#ef4444', '#a855f7', '#06b6d4', '#ec4899'];
     const datasets = wsNames.map((ws, i) => ({
       label: ws,
-      data: last14Days.map(d => workshopDailyMap[ws][d] || 0),
+      data: dateRange.map(d => workshopDailyMap[ws][d] || 0),
       backgroundColor: wsColors[i % wsColors.length] + 'cc',
       borderColor: wsColors[i % wsColors.length],
       borderWidth: 1,
       borderRadius: 3,
     }));
-    new Chart(ctx, {
+    deliveryChartInstance = new Chart(ctx, {
       type: 'bar',
       data: { labels: dailyLabels, datasets },
       options: {
@@ -492,11 +557,7 @@ export function renderDashboard() {
         },
         plugins: {
           legend: { position: 'top', labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 12, padding: 8 } },
-          tooltip: {
-            callbacks: {
-              footer: (items) => `Tổng: ${items.reduce((s, i) => s + i.raw, 0)} sp`
-            }
-          }
+          tooltip: { callbacks: { footer: (items) => `Tổng: ${items.reduce((s, i) => s + i.raw, 0)} sp` } }
         }
       }
     });
