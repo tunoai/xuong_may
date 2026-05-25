@@ -1,6 +1,6 @@
 // ===== MODULE 6: DASHBOARD =====
 import { store } from './store.js';
-import { formatNumber, formatDate, priorityBadge, statusBadge, lotLabel } from './ui.js';
+import { formatNumber, formatDate, priorityBadge, statusBadge, lotLabel, showToast } from './ui.js';
 import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);
 
@@ -167,7 +167,10 @@ export function renderDashboard() {
           <span class="dash-lot-code">${lot.id}</span>
           ${statusBadge(lot.status)}
         </div>
-        <div class="dash-lot-priority">${priorityBadge(lot.priority)}</div>
+        <div class="dash-lot-priority" style="display:flex;align-items:center;gap:6px;">
+          ${priorityBadge(lot.priority)}
+          <button class="btn-dash-delete-lot" data-lot-id="${lot.id}" title="Xóa lô vải" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px;color:var(--red);opacity:0.6;transition:opacity 0.2s;">🗑️</button>
+        </div>
       </div>
       <div class="dash-lot-info">
         <div class="dash-lot-fabric">
@@ -449,6 +452,21 @@ export function renderDashboard() {
         lotCard.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
         lotCard.classList.add('dash-lot-highlight');
         setTimeout(() => lotCard.classList.remove('dash-lot-highlight'), 2000);
+      }
+    });
+  });
+
+  // === Delete lot from dashboard ===
+  container.querySelectorAll('.btn-dash-delete-lot').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const lotId = btn.dataset.lotId;
+      const lot = store.getLot(lotId);
+      const lotName = lot ? `${lot.fabricName || ''} ${lot.color || ''} - ${lot.customerName || ''}` : lotId;
+      if (confirm(`Bạn có chắc muốn xóa lô vải "${lotName}"?\nToàn bộ dữ liệu cắt, may, QC của lô này sẽ bị xóa.`)) {
+        store.deleteLot(lotId);
+        renderDashboard();
+        showToast('Đã xóa lô vải và toàn bộ dữ liệu liên quan', 'info');
       }
     });
   });
