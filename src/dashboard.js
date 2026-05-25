@@ -471,11 +471,12 @@ function renderFilterBar(filterBarEl, allWorkshops) {
       </div>
       <div class="dash-filter-item">
         <span class="dash-filter-icon">📅</span>
-        <input type="date" id="dash-filter-date-from" value="${dashboardFilters.dateFrom}" title="Từ ngày" style="font-size:12px;" />
+        <label style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap;">Từ ngày</label>
+        <input type="date" id="dash-filter-date-from" value="${dashboardFilters.dateFrom}" style="font-size:12px;" />
       </div>
       <div class="dash-filter-item">
-        <span class="dash-filter-icon">📅</span>
-        <input type="date" id="dash-filter-date-to" value="${dashboardFilters.dateTo}" title="Đến ngày" style="font-size:12px;" />
+        <label style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap;">Đến ngày</label>
+        <input type="date" id="dash-filter-date-to" value="${dashboardFilters.dateTo}" style="font-size:12px;" />
       </div>
       <button class="dash-filter-btn${dashboardFilters.prioOnly ? ' active' : ''}" id="dash-filter-prio" title="Chỉ hiện lô có size ưu tiên">
         ⭐ Size Ưu Tiên
