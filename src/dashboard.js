@@ -413,56 +413,33 @@ export function renderDashboard() {
       const lotEntries = Object.values(wsData.lotMap).filter(e => e.inProgress > 0 || e.totalReturned > 0);
       const lotRows = lotEntries.map(e => {
         const lot = e.lot;
-        const lotLabel = lot ? `${(lot.fabricName || '').toUpperCase()}${lot.color ? ' ' + lot.color.toUpperCase() : ''}` : '?';
-        const customer = lot ? (lot.customerName || '') : '';
-        const pct = e.totalSent > 0 ? Math.round((e.totalReturned / e.totalSent) * 100) : 0;
-        const pctColor = pct >= 100 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
+        const lotLabel = lot ? `${(lot.fabricName || '').toUpperCase()}${lot.color ? ' - ' + lot.color.toUpperCase() : ''}` : '?';
         return `<tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
-          <td style="padding:10px 8px;font-weight:600;">${lotLabel}<div style="font-size:11px;color:var(--text-muted);">${customer}</div></td>
-          <td style="text-align:center;padding:10px 8px;color:var(--blue);font-weight:700;">${formatNumber(e.totalSent)}</td>
-          <td style="text-align:center;padding:10px 8px;color:var(--green);font-weight:700;">${formatNumber(e.totalReturned)}</td>
-          <td style="text-align:center;padding:10px 8px;font-weight:800;font-size:15px;color:${e.inProgress > 0 ? '#facc15' : '#4ade80'};">${e.inProgress > 0 ? formatNumber(e.inProgress) : 'ĐỦ'}</td>
-          <td style="text-align:center;padding:10px 8px;">
-            <div style="display:flex;align-items:center;gap:6px;justify-content:center;">
-              <span style="font-weight:700;color:${pctColor};">${pct}%</span>
-              <div style="width:50px;height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">
-                <div style="width:${Math.min(pct, 100)}%;height:100%;background:${pctColor};border-radius:3px;"></div>
-              </div>
-            </div>
-          </td>
+          <td style="padding:10px 8px;font-weight:600;font-size:13px;">${lotLabel}</td>
+          <td style="text-align:center;padding:10px 8px;color:var(--green);font-weight:700;font-size:14px;">${formatNumber(e.totalReturned)}</td>
+          <td style="text-align:center;padding:10px 8px;font-weight:800;font-size:14px;color:${e.inProgress > 0 ? '#facc15' : '#4ade80'};">${e.inProgress > 0 ? formatNumber(e.inProgress) : 'ĐỦ'}</td>
         </tr>`;
       }).join('');
 
       const popupOverlay = document.createElement('div');
       popupOverlay.className = 'lot-detail-overlay';
       popupOverlay.innerHTML = `
-        <div class="lot-detail-popup" style="max-width:650px;">
+        <div class="lot-detail-popup" style="max-width:450px;">
           <div class="lot-detail-popup-header">
-            <h3 style="margin:0;font-size:16px;">🏭 ${wsName} — Chi tiết lô vải</h3>
+            <h3 style="margin:0;font-size:16px;">🏭 ${wsName}</h3>
             <button class="lot-detail-close">&times;</button>
           </div>
           <div class="lot-detail-popup-body" style="padding:16px;">
-            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
-              <span style="padding:4px 12px;border-radius:12px;background:rgba(59,130,246,0.12);color:var(--blue);font-weight:600;font-size:12px;">Tổng gửi: ${formatNumber(wsData.totalSent)}</span>
-              <span style="padding:4px 12px;border-radius:12px;background:rgba(34,197,94,0.12);color:var(--green);font-weight:600;font-size:12px;">Đã giao: ${formatNumber(wsData.totalReturned)}</span>
-              <span style="padding:4px 12px;border-radius:12px;background:rgba(234,179,8,0.12);color:#facc15;font-weight:600;font-size:12px;">Còn lại: ${formatNumber(Math.max(0, wsData.totalSent - wsData.totalReturned))}</span>
-              <span style="padding:4px 12px;border-radius:12px;background:rgba(139,92,246,0.12);color:#a78bfa;font-weight:600;font-size:12px;">Hoàn thành: ${wsData.progress}%</span>
-            </div>
-            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
               <thead>
                 <tr style="border-bottom:2px solid rgba(255,255,255,0.1);">
-                  <th style="text-align:left;padding:8px;color:var(--text-muted);font-size:10px;">LÔ VẢI</th>
-                  <th style="text-align:center;padding:8px;color:var(--blue);font-size:10px;">ĐÃ GỬI</th>
-                  <th style="text-align:center;padding:8px;color:var(--green);font-size:10px;">ĐÃ GIAO</th>
-                  <th style="text-align:center;padding:8px;color:#facc15;font-size:10px;">CÒN LẠI</th>
-                  <th style="text-align:center;padding:8px;color:var(--text-muted);font-size:10px;">TIẾN ĐỘ</th>
+                  <th style="text-align:left;padding:8px;color:var(--text-muted);font-size:11px;">LÔ VẢI</th>
+                  <th style="text-align:center;padding:8px;color:var(--green);font-size:11px;">ĐÃ GIAO</th>
+                  <th style="text-align:center;padding:8px;color:#facc15;font-size:11px;">CÒN LẠI</th>
                 </tr>
               </thead>
-              <tbody>${lotRows}</tbody>
+              <tbody>${lotRows || '<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-muted)">Không có lô nào</td></tr>'}</tbody>
             </table>
-          </div>
-          <div style="padding:12px 16px;text-align:right;border-top:1px solid rgba(255,255,255,0.06);">
-            <button class="lot-detail-close" style="padding:8px 24px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);cursor:pointer;font-size:13px;">Đóng</button>
           </div>
         </div>`;
       document.body.appendChild(popupOverlay);
