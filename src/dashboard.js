@@ -475,13 +475,13 @@ function renderDeliveryChart() {
   const activeIdx = quickFilters.findIndex(q => q.from === deliveryFilter.from && q.to === deliveryFilter.to);
 
   section.innerHTML = `
-    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:14px;">
-      ${quickFilters.map((q, i) => `<button class="delivery-quick-btn${i === activeIdx ? ' active' : ''}" data-idx="${i}" style="padding:5px 12px;font-size:11px;font-weight:600;border-radius:6px;border:1px solid ${i === activeIdx ? 'var(--accent)' : 'var(--border)'};background:${i === activeIdx ? 'rgba(59,130,246,0.15)' : 'var(--bg-card)'};color:${i === activeIdx ? 'var(--accent)' : 'var(--text-muted)'};cursor:pointer;transition:all 0.2s;">${q.label}</button>`).join('')}
-      <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
-        <label style="font-size:11px;color:var(--text-muted);font-weight:600;">Từ</label>
-        <input type="date" id="delivery-from" value="${deliveryFilter.from}" style="font-size:11px;padding:4px 8px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);" />
-        <label style="font-size:11px;color:var(--text-muted);font-weight:600;">Đến</label>
-        <input type="date" id="delivery-to" value="${deliveryFilter.to}" style="font-size:11px;padding:4px 8px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);" />
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px;">
+      ${quickFilters.map((q, i) => `<button class="delivery-quick-btn${i === activeIdx ? ' active' : ''}" data-idx="${i}" style="padding:10px 18px;font-size:14px;font-weight:600;border-radius:8px;border:1px solid ${i === activeIdx ? 'var(--accent)' : 'var(--border)'};background:${i === activeIdx ? 'rgba(59,130,246,0.15)' : 'var(--bg-card)'};color:${i === activeIdx ? 'var(--accent)' : 'var(--text-muted)'};cursor:pointer;transition:all 0.2s;">${q.label}</button>`).join('')}
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+        <label style="font-size:13px;color:var(--text-muted);font-weight:600;">Từ</label>
+        <input type="date" id="delivery-from" value="${deliveryFilter.from}" style="font-size:14px;padding:8px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);" />
+        <label style="font-size:13px;color:var(--text-muted);font-weight:600;">Đến</label>
+        <input type="date" id="delivery-to" value="${deliveryFilter.to}" style="font-size:14px;padding:8px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);" />
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
