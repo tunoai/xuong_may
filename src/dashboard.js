@@ -1,6 +1,6 @@
 // ===== MODULE 6: DASHBOARD =====
 import { store } from './store.js';
-import { formatNumber, formatDate, priorityBadge, statusBadge, lotLabel, showToast } from './ui.js';
+import { formatNumber, formatDate, priorityBadge, statusBadge, lotLabel, showToast, openModal, closeModal } from './ui.js';
 import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);
 
@@ -446,16 +446,11 @@ export function renderDashboard() {
     </div>
   `;
 
-  // === Alert click -> scroll to lot card ===
+  // === Alert click -> show lot detail popup ===
   container.querySelectorAll('.alert-item[data-lot-id]').forEach(el => {
     el.addEventListener('click', () => {
       const lotId = el.dataset.lotId;
-      const lotCard = container.querySelector(`.dash-lot-card[data-lot-id="${lotId}"]`);
-      if (lotCard) {
-        lotCard.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-        lotCard.classList.add('dash-lot-highlight');
-        setTimeout(() => lotCard.classList.remove('dash-lot-highlight'), 2000);
-      }
+      showLotDetailPopup(lotId);
     });
   });
 
@@ -538,4 +533,133 @@ function renderFilterBar(filterBarEl, allWorkshops) {
     filtersRendered = false;
     renderDashboard();
   });
+}
+
+function showLotDetailPopup(lotId) {
+  const lot = store.getLot(lotId);
+  if (!lot) return;
+
+  const summary = store.getLotSummary(lotId);
+  if (!summary) return;
+
+  const sizeBreak = store.getSizeBreakdownByLot(lotId);
+  const prioSizes = store.getPrioritySizes(lotId);
+  const lotSewings = store.getSewingsByLot(lotId);
+  const workshopNames = [...new Set(lotSewings.map(s => s.workshopName).filter(Boolean))];
+  const progress = summary.totalCut > 0 ? Math.round((summary.totalPassed / summary.totalCut) * 100) : 0;
+  const totalRemaining = summary.totalCut - summary.totalPassed - summary.totalFailed;
+  const isCompleted = summary.totalCut > 0 && totalRemaining <= 0 && summary.totalFailed === 0;
+
+  // Sort: remaining > 0 first (ascending), then done
+  const sortedSizes = [...sizeBreak].sort((a, b) => {
+    const remA = a.cut - a.passed - a.failed;
+    const remB = b.cut - b.passed - b.failed;
+    if (remA > 0 && remB <= 0) return -1;
+    if (remA <= 0 && remB > 0) return 1;
+    if (remA > 0 && remB > 0) return remA - remB;
+    return 0;
+  });
+
+  // Build remaining sizes section
+  const remainingSizes = sortedSizes.filter(s => (s.cut - s.passed - s.failed) > 0);
+  const doneSizes = sortedSizes.filter(s => (s.cut - s.passed - s.failed) <= 0);
+
+  const buildSizeRow = (s) => {
+    const rem = s.cut - s.passed - s.failed;
+    const isPrio = prioSizes.includes(s.size);
+    const isLow = rem > 0 && rem < 10;
+    const isDone = rem <= 0;
+    const remColor = isDone ? '#4ade80' : isLow ? '#f87171' : '#facc15';
+    const remBg = isDone ? 'rgba(34,197,94,0.12)' : isLow ? 'rgba(239,68,68,0.12)' : 'rgba(234,179,8,0.12)';
+    return `<tr style="${isPrio ? 'background:rgba(245,158,11,0.06);' : ''}">
+      <td style="font-weight:700;font-size:14px;">${isPrio ? '⭐ ' : ''}${s.size}</td>
+      <td style="text-align:center;font-weight:800;font-size:16px;padding:6px 12px;background:${remBg};color:${remColor};border-radius:6px;">${isDone ? '✓' : rem}</td>
+      <td style="text-align:center;color:var(--blue)">${s.cut}</td>
+      <td style="text-align:center;color:var(--orange)">${s.inProgress}</td>
+      <td style="text-align:center;color:var(--green)">${s.passed}</td>
+      <td style="text-align:center;color:var(--red)">${s.failed}</td>
+    </tr>`;
+  };
+
+  // Build sewing progress per workshop
+  const workshopRows = lotSewings.map(sewing => {
+    const sizes = store.getSewingSizes(sewing.id);
+    const totalSent = sizes.reduce((s, sz) => s + sz.quantitySent, 0);
+    const totalReturned = sizes.reduce((s, sz) => s + sz.quantityReturned, 0);
+    const remaining = totalSent - totalReturned;
+    const sizeDetail = sizes.filter(sz => sz.quantitySent - sz.quantityReturned > 0)
+      .map(sz => `<span style="display:inline-block;margin:2px 4px;padding:2px 8px;background:rgba(234,179,8,0.12);border-radius:4px;font-size:11px;color:#facc15;font-weight:600">${sz.size}: ${sz.quantitySent - sz.quantityReturned}</span>`)
+      .join('');
+    const doneDetail = sizes.filter(sz => sz.quantitySent - sz.quantityReturned <= 0 && sz.quantitySent > 0)
+      .map(sz => `<span style="display:inline-block;margin:2px 4px;padding:2px 8px;background:rgba(34,197,94,0.12);border-radius:4px;font-size:11px;color:#4ade80;font-weight:600">${sz.size}: ✓</span>`)
+      .join('');
+    return `<div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <span style="font-weight:700;font-size:13px;">🏭 ${sewing.workshopName || '—'}</span>
+        <span style="font-size:12px;color:var(--text-muted)">${sewing.id}</span>
+      </div>
+      <div style="display:flex;gap:12px;font-size:12px;margin-bottom:6px;">
+        <span>Gửi: <strong style="color:var(--blue)">${totalSent}</strong></span>
+        <span>Giao: <strong style="color:var(--green)">${totalReturned}</strong></span>
+        <span>Còn: <strong style="color:${remaining > 0 ? 'var(--yellow)' : 'var(--green)'}">${remaining > 0 ? remaining : '✓'}</strong></span>
+      </div>
+      <div>${sizeDetail}${doneDetail}</div>
+    </div>`;
+  }).join('');
+
+  const lotTitle = `${(lot.fabricName || '').toUpperCase()}${lot.color ? ' ' + lot.color.toUpperCase() : ''}`;
+
+  const modalBody = `
+    <div style="margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);">${lot.id} · ${lot.customerName || ''}</div>
+          <div style="font-size:18px;font-weight:800;color:var(--text-primary);">🧵 ${lotTitle}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:24px;font-weight:800;color:${progress >= 100 ? 'var(--green)' : 'var(--accent)'};">${progress}%</div>
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">tiến độ</div>
+        </div>
+      </div>
+      ${isCompleted ? '<div style="text-align:center;padding:8px;background:linear-gradient(135deg,rgba(34,197,94,0.2),rgba(16,163,74,0.15));border:1px solid rgba(34,197,94,0.4);border-radius:8px;color:#4ade80;font-size:14px;font-weight:800;letter-spacing:1px;margin-bottom:12px;">✅ ĐÃ GIAO HẾT</div>' : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;">
+        <span style="padding:3px 10px;border-radius:12px;background:rgba(59,130,246,0.12);color:var(--blue);font-weight:600;">Cắt: ${formatNumber(summary.totalCut)}</span>
+        <span style="padding:3px 10px;border-radius:12px;background:rgba(249,115,22,0.12);color:var(--orange);font-weight:600;">Đang may: ${formatNumber(Math.max(0, summary.totalSent - summary.totalReturned))}</span>
+        <span style="padding:3px 10px;border-radius:12px;background:rgba(34,197,94,0.12);color:var(--green);font-weight:600;">QC Pass: ${formatNumber(summary.totalPassed)}</span>
+        ${summary.totalFailed > 0 ? `<span style="padding:3px 10px;border-radius:12px;background:rgba(239,68,68,0.12);color:var(--red);font-weight:600;">Lỗi: ${formatNumber(summary.totalFailed)}</span>` : ''}
+        <span style="padding:3px 10px;border-radius:12px;background:rgba(234,179,8,0.12);color:#facc15;font-weight:600;">Còn lại: ${formatNumber(Math.max(0, totalRemaining))}</span>
+      </div>
+    </div>
+
+    <!-- SIZE TABLE -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">📊 Chi tiết theo size</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
+            <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-size:10px;">SIZE</th>
+            <th style="text-align:center;padding:6px 8px;color:#facc15;font-size:10px;">CÒN LẠI</th>
+            <th style="text-align:center;padding:6px 8px;color:var(--blue);font-size:10px;">CẮT</th>
+            <th style="text-align:center;padding:6px 8px;color:var(--orange);font-size:10px;">ĐANG MAY</th>
+            <th style="text-align:center;padding:6px 8px;color:var(--green);font-size:10px;">PASS</th>
+            <th style="text-align:center;padding:6px 8px;color:var(--red);font-size:10px;">LỖI</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${remainingSizes.map(s => buildSizeRow(s)).join('')}
+          ${doneSizes.length > 0 && remainingSizes.length > 0 ? '<tr><td colspan="6" style="padding:4px 0;"><div style="border-top:1px dashed rgba(34,197,94,0.3);"></div></td></tr>' : ''}
+          ${doneSizes.map(s => buildSizeRow(s)).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- WORKSHOP PROGRESS -->
+    ${workshopRows ? `<div>
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">🏭 Tiến độ theo xưởng</div>
+      ${workshopRows}
+    </div>` : ''}
+  `;
+
+  openModal(`📋 Chi tiết lô: ${lotTitle} - ${lot.customerName || ''}`, modalBody,
+    `<button class="btn btn-secondary" onclick="document.getElementById('modal-overlay').classList.add('hidden')">Đóng</button>`);
 }
