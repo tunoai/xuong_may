@@ -542,55 +542,33 @@ function renderDeliveryChart() {
     const parts = dateStr.split('-');
     const displayDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
 
-    // Get deliveries for this day
-    const dayDeliveries = allDeliveries.filter(d => {
+    // Group by workshop for this day
+    const wsTotal = {};
+    allDeliveries.forEach(d => {
       const ds = d.createdAt ? d.createdAt.split('T')[0] : '';
-      return ds === dateStr;
-    });
-
-    // Group by workshop
-    const wsData = {};
-    dayDeliveries.forEach(d => {
+      if (ds !== dateStr) return;
       const sewing = store.getSewing(d.sewingId);
       const wsName = sewing ? (sewing.workshopName || 'Khác') : 'Khác';
-      const lot = sewing ? store.getLot(sewing.lotId) : null;
-      const lotName = lot ? `${(lot.fabricName || '').toUpperCase()}${lot.color ? ' ' + lot.color.toUpperCase() : ''}` : '';
       const sizes = store.getDeliverySizes(d.id);
-      const totalQty = sizes.reduce((sum, sz) => sum + sz.quantity, 0);
-      const sizeDetail = sizes.map(sz => `${sz.size}: ${sz.quantity}`).join(', ');
-
-      if (!wsData[wsName]) wsData[wsName] = { total: 0, items: [] };
-      wsData[wsName].total += totalQty;
-      wsData[wsName].items.push({ lotName, totalQty, sizeDetail, deliveryId: d.id });
+      const qty = sizes.reduce((sum, sz) => sum + sz.quantity, 0);
+      wsTotal[wsName] = (wsTotal[wsName] || 0) + qty;
     });
 
-    const totalDay = Object.values(wsData).reduce((s, w) => s + w.total, 0);
+    const totalDay = Object.values(wsTotal).reduce((s, v) => s + v, 0);
 
-    header.innerHTML = `📅 Chi tiết ngày <span style="color:var(--accent);font-size:14px;">${displayDate}</span> — <span style="color:var(--green)">${formatNumber(totalDay)} sp</span> <button id="btn-back-ws-table" style="margin-left:12px;padding:4px 12px;font-size:11px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:6px;color:var(--text-muted);cursor:pointer;">← Quay lại</button>`;
+    header.innerHTML = `📅 Ngày <span style="color:var(--accent);font-size:14px;">${displayDate}</span> — <span style="color:var(--green)">${formatNumber(totalDay)} sp</span> <button id="btn-back-ws-table" style="margin-left:12px;padding:4px 12px;font-size:11px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:6px;color:var(--text-muted);cursor:pointer;">← Quay lại</button>`;
 
-    let detailHTML = '';
-    Object.keys(wsData).forEach(ws => {
-      const wd = wsData[ws];
-      detailHTML += `<div style="margin-bottom:14px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(59,130,246,0.08);border-radius:8px;margin-bottom:6px;">
-          <span style="font-weight:700;font-size:13px;">🏭 ${ws}</span>
-          <span style="font-weight:800;color:var(--blue);font-size:14px;">${formatNumber(wd.total)} sp</span>
-        </div>`;
-      wd.items.forEach(item => {
-        detailHTML += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 14px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px;">
-          <span style="color:var(--text-secondary);">${item.lotName || item.deliveryId}</span>
-          <span style="font-weight:600;color:var(--green);">${formatNumber(item.totalQty)} sp</span>
-        </div>
-        <div style="padding:2px 14px 6px;font-size:11px;color:var(--text-muted);">${item.sizeDetail}</div>`;
-      });
-      detailHTML += `</div>`;
-    });
+    const rows = Object.entries(wsTotal)
+      .sort((a, b) => b[1] - a[1])
+      .map(([ws, qty]) => `<tr>
+        <td style="font-weight:700;padding:10px 8px;">🏭 ${ws}</td>
+        <td style="text-align:center;font-weight:800;font-size:16px;color:var(--blue);padding:10px 8px;">${formatNumber(qty)} sp</td>
+      </tr>`).join('');
 
-    if (!detailHTML) detailHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)">Không có dữ liệu giao hàng ngày này</div>';
+    content.innerHTML = rows
+      ? `<table style="width:100%;border-collapse:collapse;font-size:13px;">${rows}</table>`
+      : '<div style="text-align:center;padding:20px;color:var(--text-muted)">Không có dữ liệu</div>';
 
-    content.innerHTML = detailHTML;
-
-    // Back button
     document.getElementById('btn-back-ws-table')?.addEventListener('click', () => {
       renderDeliveryChart();
     });
