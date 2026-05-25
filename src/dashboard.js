@@ -345,45 +345,51 @@ export function renderDashboard() {
   });
   const overallProgress = totalCutAll > 0 ? Math.round((totalPassedAll / totalCutAll) * 100) : 0;
 
-  // === Material Stock & Shortage Calculation ===
-  const materialStats = {};
-  store.getMaterials().forEach(m => {
-    materialStats[m.id] = { name: m.name, stock: m.stock, unit: m.unit, required: 0 };
+  // === Daily Delivery Data (NHẬN HÀNG TỪ XƯỞNG MAY) ===
+  const allDeliveries = store.getDeliveries();
+  const dailyDeliveryMap = {};
+  const workshopDailyMap = {};
+  allDeliveries.forEach(d => {
+    const dateStr = d.createdAt ? d.createdAt.split('T')[0] : '';
+    if (!dateStr) return;
+    const sewing = store.getSewing(d.sewingId);
+    const workshopName = sewing ? (sewing.workshopName || 'Khác') : 'Khác';
+    const sizes = store.getDeliverySizes(d.id);
+    const totalQty = sizes.reduce((sum, sz) => sum + sz.quantity, 0);
+    
+    if (!dailyDeliveryMap[dateStr]) dailyDeliveryMap[dateStr] = 0;
+    dailyDeliveryMap[dateStr] += totalQty;
+
+    if (!workshopDailyMap[workshopName]) workshopDailyMap[workshopName] = {};
+    if (!workshopDailyMap[workshopName][dateStr]) workshopDailyMap[workshopName][dateStr] = 0;
+    workshopDailyMap[workshopName][dateStr] += totalQty;
   });
 
-  lots.forEach(lot => {
-    if (!lot.techpackId) return;
-    const tp = store.getTechpacks().find(t => t.id === lot.techpackId);
-    if (!tp || !tp.bom) return;
-    
-    const summary = store.getLotSummary(lot.id);
-    if (!summary) return;
-    
-    const pendingGarments = summary.totalCut - summary.totalReturned;
-    if (pendingGarments > 0) {
-      tp.bom.forEach(b => {
-        if (b.materialId && materialStats[b.materialId]) {
-          materialStats[b.materialId].required += (b.quantity * pendingGarments);
-        }
-      });
-    }
-  });
+  // Get last 14 days
+  const today = new Date();
+  const last14Days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    last14Days.push(d.toISOString().split('T')[0]);
+  }
+  const dailyLabels = last14Days.map(d => { const p = d.split('-'); return `${p[2]}/${p[1]}`; });
+  const dailyValues = last14Days.map(d => dailyDeliveryMap[d] || 0);
 
-  const materialRows = Object.values(materialStats).filter(m => {
-    return true;
-  }).map(m => {
-    const isShort = m.stock < m.required;
-    const shortage = isShort ? (m.required - m.stock) : 0;
-    return `
-      <tr>
-        <td><strong>${m.name}</strong></td>
-        <td style="color:var(--blue); font-weight:bold">${formatNumber(m.stock)} ${m.unit}</td>
-        <td>${formatNumber(m.required)} ${m.unit}</td>
-        <td style="color:${isShort ? 'var(--red)' : 'var(--green)'}; font-weight:bold">
-          ${isShort ? `Thiếu ${formatNumber(shortage)}` : 'Đủ'}
-        </td>
-      </tr>
-    `;
+  // Workshop breakdown table rows
+  const wsNames = Object.keys(workshopDailyMap);
+  const workshopTableRows = wsNames.map(ws => {
+    const dailyVals = last14Days.map(d => workshopDailyMap[ws][d] || 0);
+    const total = dailyVals.reduce((a, b) => a + b, 0);
+    const daysWorked = dailyVals.filter(v => v > 0).length;
+    const avg = daysWorked > 0 ? Math.round(total / daysWorked) : 0;
+    const max = Math.max(...dailyVals);
+    return `<tr>
+      <td style="font-weight:700;">${ws}</td>
+      <td style="text-align:center;color:var(--blue);font-weight:800;">${formatNumber(total)}</td>
+      <td style="text-align:center;color:var(--green);font-weight:600;">${formatNumber(avg)}</td>
+      <td style="text-align:center;color:var(--yellow);">${formatNumber(max)}</td>
+      <td style="text-align:center;">${daysWorked} ngày</td>
+    </tr>`;
   }).join('');
 
   container.innerHTML = `
@@ -407,23 +413,33 @@ export function renderDashboard() {
       </div>
     </div>
 
-    <!-- Material Shortage Report -->
+    <!-- NHẬN HÀNG TỪ XƯỞNG MAY -->
     <div class="dashboard-section" style="margin-top:20px;">
-      <h3>📦 Tồn Kho & Dự Báo Phụ Liệu <span style="font-size:12px; font-weight:400; color:var(--text-muted)">(Cần dùng cho hàng đang cắt/may)</span></h3>
-      <div class="table-container">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Tên Phụ Liệu</th>
-              <th>Tồn Kho Hiện Tại</th>
-              <th>Cần Dùng (Đang May)</th>
-              <th>Trạng Thái</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${materialRows || '<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted)">Không có dữ liệu phụ liệu</td></tr>'}
-          </tbody>
-        </table>
+      <h3>📦 Nhận Hàng Từ Xưởng May <span style="font-size:12px; font-weight:400; color:var(--text-muted)">(14 ngày gần nhất)</span></h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;">
+          <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:10px;">Biểu đồ giao hàng theo ngày</div>
+          <div class="chart-container" style="height:250px;">
+            <canvas id="daily-delivery-chart"></canvas>
+          </div>
+        </div>
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;">
+          <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:10px;">🏭 Năng lực sản xuất theo xưởng</div>
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
+                <th style="text-align:left;padding:8px 6px;color:var(--text-muted);font-size:10px;">XƯỞNG</th>
+                <th style="text-align:center;padding:8px 6px;color:var(--blue);font-size:10px;">TỔNG GIAO</th>
+                <th style="text-align:center;padding:8px 6px;color:var(--green);font-size:10px;">TB/NGÀY</th>
+                <th style="text-align:center;padding:8px 6px;color:var(--yellow);font-size:10px;">CAO NHẤT</th>
+                <th style="text-align:center;padding:8px 6px;color:var(--text-muted);font-size:10px;">SỐ NGÀY</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${workshopTableRows || '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">Chưa có dữ liệu giao hàng</td></tr>'}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   `;
@@ -450,6 +466,41 @@ export function renderDashboard() {
       }
     });
   });
+
+  // === Render Daily Delivery Chart ===
+  const deliveryCanvas = document.getElementById('daily-delivery-chart');
+  if (deliveryCanvas) {
+    const ctx = deliveryCanvas.getContext('2d');
+    const wsColors = ['#3b82f6', '#f59e0b', '#22c55e', '#ef4444', '#a855f7', '#06b6d4', '#ec4899'];
+    const datasets = wsNames.map((ws, i) => ({
+      label: ws,
+      data: last14Days.map(d => workshopDailyMap[ws][d] || 0),
+      backgroundColor: wsColors[i % wsColors.length] + 'cc',
+      borderColor: wsColors[i % wsColors.length],
+      borderWidth: 1,
+      borderRadius: 3,
+    }));
+    new Chart(ctx, {
+      type: 'bar',
+      data: { labels: dailyLabels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+          y: { stacked: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { size: 10 } }, beginAtZero: true }
+        },
+        plugins: {
+          legend: { position: 'top', labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 12, padding: 8 } },
+          tooltip: {
+            callbacks: {
+              footer: (items) => `Tổng: ${items.reduce((s, i) => s + i.raw, 0)} sp`
+            }
+          }
+        }
+      }
+    });
+  }
 }
 
 function renderFilterBar(filterBarEl, allWorkshops) {
